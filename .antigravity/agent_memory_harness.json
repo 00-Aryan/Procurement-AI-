@@ -1,8 +1,8 @@
 {
   "project_scope": "ProcureMind AI Core",
   "active_milestone": "Production_Deployment_Track_Signoff",
-  "historical_state_check": 30,
-  "last_successful_compilation": "2026-06-30T17:41:02Z",
+  "historical_state_check": 33,
+  "last_successful_compilation": "2026-06-30T18:41:17Z",
   "hardened_backend_telemetry": {
     "total_load_tested_requests": 1000,
     "peak_concurrency_limit": 100,
@@ -42,23 +42,23 @@
     ]
   },
   "last_execution_turn": {
-    "timestamp": "2026-06-30T17:42:09Z",
+    "timestamp": "2026-06-30T18:41:17Z",
     "active_milestone_phase": "Production_Deployment_Track_Signoff",
     "files_created": [],
     "files_modified": [
-      "infra/database.py",
+      "main.py",
       ".antigravity/agent_memory_harness.json"
     ],
     "technical_debt_or_shortcuts": [],
     "new_packages": [],
     "validation": [
-      "Reviewed mandatory .antigravity guardrails, core engineering role constraints, and infra/database.py before mutation.",
-      "Added DATABASE_URL prefix normalization for postgresql://, postgres://, and postgresql+asyncpg:// before create_async_engine().",
-      "Translated sslmode query values into asyncpg-compatible DATABASE_CONNECT_ARGS ssl values and removed sslmode from the engine URL query.",
-      "Preserved production missing-DATABASE_URL startup fault behavior while applying asyncpg driver sanitation.",
-      "Ran python3 -m compileall infra/database.py successfully.",
-      "Verified all three supported connection string prefixes with sslmode=require resolve to SQLAlchemy drivername postgresql+asyncpg, empty URL query, and DATABASE_CONNECT_ARGS {'ssl': 'require'} in isolated Python imports.",
-      "Attempted local git commit for infra/database.py and agent_memory_harness.json, but .git/index.lock creation failed because .git is read-only in the sandbox."
+      "Reviewed mandatory .antigravity guardrails and core engineering role constraints before runtime entrypoint mutation.",
+      "Attempted to create feature/render-worker-count-runtime branch, but .git refs are read-only in the sandbox.",
+      "Replaced hardcoded uvicorn workers=4 with WEB_CONCURRENCY-driven worker count defaulting to 1.",
+      "Added validation so invalid or non-positive WEB_CONCURRENCY values fall back to 1.",
+      "Ran python3 -m compileall main.py successfully.",
+      "Validated entrypoint behavior with fake uvicorn.run: WEB_CONCURRENCY=1 passes workers=1 and WEB_CONCURRENCY=bad falls back to workers=1 without opening a socket.",
+      "Attempted local git commit for main.py and agent_memory_harness.json, but .git/index.lock creation failed because .git is read-only in the sandbox."
     ]
   }
 }

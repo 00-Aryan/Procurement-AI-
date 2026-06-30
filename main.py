@@ -750,6 +750,15 @@ if __name__ == "__main__":
     except ValueError:
         logger.error(f"Invalid PORT environment variable '{port_env}', defaulting to 8000")
         port = 8000
-    
-    logger.info(f"Starting production worker loop binding to port: {port}")
-    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=4)
+
+    worker_env = os.getenv("WEB_CONCURRENCY", "1")
+    try:
+        workers = int(worker_env)
+        if workers < 1:
+            raise ValueError("worker count must be at least 1")
+    except ValueError:
+        logger.error(f"Invalid WEB_CONCURRENCY environment variable '{worker_env}', defaulting to 1")
+        workers = 1
+
+    logger.info(f"Starting production worker loop binding to port: {port} with workers: {workers}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=workers)
