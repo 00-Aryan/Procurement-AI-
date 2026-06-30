@@ -42,6 +42,7 @@ export const tenantProfile = industryConfig.tenant_profile;
 
 export const navItems: NavItem[] = [
   { label: "Home", href: "/", icon: Home },
+  { label: "Data Gateway", href: "/ingestion", icon: UploadCloud },
   { label: "Demand Forecast", href: "/demand", icon: TrendingUp, comingSoon: true },
   { label: "Inventory Intelligence", href: "/inventory", icon: Boxes },
   { label: "Supplier Intelligence", href: "/supplier", icon: UsersRound, comingSoon: true },

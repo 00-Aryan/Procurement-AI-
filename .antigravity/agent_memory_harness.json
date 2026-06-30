@@ -1,8 +1,8 @@
 {
   "project_scope": "ProcureMind AI Core",
   "active_milestone": "Production_Deployment_Track_Signoff",
-  "historical_state_check": 22,
-  "last_successful_compilation": "2026-06-30T15:02:00Z",
+  "historical_state_check": 25,
+  "last_successful_compilation": "2026-06-30T22:00:00Z",
   "hardened_backend_telemetry": {
     "total_load_tested_requests": 1000,
     "peak_concurrency_limit": 100,
@@ -12,7 +12,8 @@
   "enforced_api_contracts": [
     "POST /api/v1/procurement/simulate expects wrapped {'matrix': SimulationMatrix} schema",
     "Global error boundaries emit bracketed custom exception logs: [VALIDATION_ERROR] and [TENANT_AUTH_ERROR]",
-    "POST /api/v1/procurement/ingest-history accepts multi-part form files and stages validated records in PostgreSQL"
+    "POST /api/v1/procurement/ingest-history accepts multi-part form files and stages validated records in PostgreSQL",
+    "Track 1 gateway throttles emit [RATE_LIMIT_EXHAUSTED] at HTTP 429 for exhausted tenant or session windows"
   ],
   "local_postgres_infrastructure": {
     "status": "provisioned",
@@ -41,21 +42,30 @@
     ]
   },
   "last_execution_turn": {
-    "timestamp": "2026-06-30T15:02:00Z",
-    "active_milestone_phase": "Production_Deployment_Track_Signoff",
-    "files_created": [],
-    "files_modified": [
-      "backend.Dockerfile",
-      "pyproject.toml",
-      "uv.lock",
-      "web/frontend.Dockerfile"
+    "timestamp": "2026-06-30T22:00:00Z",
+    "active_milestone_phase": "Phase_11_MLOps_and_Advanced_Ingestion",
+    "files_created": [
+      "web/src/components/MultiFileDropzone.tsx",
+      "web/src/components/AnalyticsSkeleton.tsx",
+      "web/src/app/ingestion/page.tsx"
     ],
-    "technical_debt_or_shortcuts": [],
+    "files_modified": [
+      "web/src/lib/gatewayErrors.ts",
+      "web/src/lib/dashboard.ts",
+      ".antigravity/backlog_and_debt.md",
+      ".antigravity/agent_memory_harness.json"
+    ],
+    "technical_debt_or_shortcuts": [
+      "DEBT-005: main.py memory-backed sliding-window limiter is per API worker; replace with Redis-backed shared limiter before horizontally scaled public production rollout."
+    ],
     "new_packages": [],
     "validation": [
-      "Rebased backend container to Python 3.12-slim base image",
-      "Pinned Python 3.12 constraints in pyproject.toml",
-      "Verified build/run orchestration, verified anomalies API output using curl"
+      "Created the interactive MultiFileDropzone client component with 5 slots.",
+      "Created the animated AnalyticsSkeleton mimicking risk charts, stockout counters, and recommendation cards.",
+      "Created the Data Gateway ingestion page wrapping dropzone and skeletons in a space-y-8 scrolling layout frame.",
+      "Added rate limit and data engineering exception markers to gatewayErrors.ts.",
+      "Registered the /ingestion page path in the navigation list in dashboard.ts.",
+      "Verified build linting and compilation success on frontend."
     ]
   }
 }

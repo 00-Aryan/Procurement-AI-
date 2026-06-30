@@ -8,7 +8,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -206,10 +208,20 @@ class SessionStateRegistry(Base):
 
 class StagedIngestion(Base):
     __tablename__ = "staged_ingestion"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "file_name",
+            "row_index",
+            name="uq_staged_ingestion_tenant_file_row",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
     vector_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    row_index: Mapped[int] = mapped_column(Integer, nullable=False)
     payload: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB,
         nullable=False,
@@ -222,6 +234,14 @@ class StagedIngestion(Base):
 
 class MLOpsModelRegistry(Base):
     __tablename__ = "mlops_model_registry"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "run_id",
+            "execution_timestamp",
+            name="uq_mlops_model_registry_tenant_run_execution",
+        ),
+    )
 
     run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -244,5 +264,4 @@ class MLOpsModelRegistry(Base):
 
 
 # ponytail: GIN indexes removed (DEBT-003)
-
 

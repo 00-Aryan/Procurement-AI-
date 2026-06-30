@@ -39,6 +39,7 @@
 - [x] M2: Baseline financial exposure velocity forecasting model
 - [x] M3: Adaptive ARIMA/Prophet challenger model with real-time parameter tuning
 - [x] M4: Persistent PostgreSQL MLOps Model Registry and Pipeline Wiring
+- [x] M5: Multi-File Ingestion Dropzone Dashboard and Shimmering Skeletons
 
 ## Milestone: Production Deployment Track - COMPLETED
 - [x] D1: Multi-stage backend and frontend Dockerfiles
@@ -56,3 +57,4 @@
 - [DEBT-002] location: `core/anomaly_engine.py` | description: Isolation Forest training maps target vectors statically on initial load. | mitigation path: Implement an active rolling fitting loop inside an asynchronous background task worker.
 - [DEBT-003] [RESOLVED] location: `infra/database.py` | description: Unused GIN indexes and bidirectional graph relationships are inflating database initialization memory footprint. | mitigation path: Resolved via ponytail optimization pass (removed GIN indexes and bidirectional relations).
 - [DEBT-004] [RESOLVED] location: `scripts/generate_synthetic_data.py` | description: Script imports heavy external dependencies (pandas, numpy) where standard library alternatives are sufficient. | mitigation path: Resolved by refactoring data generation loops to leverage standard python lists and dict structures.
+- [DEBT-005] location: `main.py` | description: Track 1 rate limiting uses an in-process sliding-window store, so limits are enforced per API worker rather than globally across a horizontally scaled cluster. | mitigation path: Replace the memory store with a shared Redis-backed limiter before multi-worker public production rollout.
