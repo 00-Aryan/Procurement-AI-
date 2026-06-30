@@ -208,5 +208,29 @@ class StagedIngestion(Base):
     tenant: Mapped["Tenant"] = relationship()
 
 
+class MLOpsModelRegistry(Base):
+    __tablename__ = "mlops_model_registry"
+
+    run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    associated_business_question: Mapped[str] = mapped_column(String, nullable=False)
+    model_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_version: Mapped[str] = mapped_column(String(50), nullable=False)
+    hyperparameters_used: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb")
+    )
+    calculated_metrics_score: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb")
+    )
+    execution_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+
+    tenant: Mapped["Tenant"] = relationship()
+
+
 # ponytail: GIN indexes removed (DEBT-003)
+
 

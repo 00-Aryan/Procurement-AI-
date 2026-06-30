@@ -12,8 +12,9 @@ import asyncio
 from core.config_parser import load_config, CELRuleEvaluator, IndustryConfig, ProcurementException, log_and_raise
 from core.scenario_simulator import ProcurementScenarioSimulator
 from core.llm_memory_bridge import CopilotDecisionOutput, ProcureMindMemoryBridge
-from infra.database import tenant_session, Node, Flow, StagedIngestion
+from infra.database import tenant_session, Node, Flow, StagedIngestion, MLOpsModelRegistry
 from core.ingestion_pipeline import ProcureMindDataIngestionGateway, DataEngineeringError
+
 
 
 
@@ -160,6 +161,43 @@ async def verify_tenant_isolation(x_tenant_id: Optional[str] = Header(None, alia
     return x_tenant_id
 
 
+async def log_forecasting_run(tenant_id: str, associated_business_question: str):
+    # Retrieve historical demand baseline from standard seeded list
+    historical_demand = [10.0, 12.0, 15.0, 13.0, 16.0, 18.0, 17.0, 20.0, 22.0, 21.0]
+    
+    from core.forecasting_engine import execute_champion_challenger_duel
+    duel_results = execute_champion_challenger_duel(
+        historical_demand=historical_demand,
+        steps=8,
+        tenant_id=tenant_id
+    )
+    
+    champion = duel_results["active_champion"]
+    active_profile = (
+        duel_results["baseline_error_profile"] 
+        if champion == "BaselineVelocityModel" 
+        else duel_results["challenger_error_profile"]
+    )
+    
+    hyperparameters = {}
+    if champion == "AdaptiveTimeSeriesChallenger":
+        hyperparameters = active_profile.get("tuned_configuration", {})
+    else:
+        hyperparameters = {"window_size": 3}
+        
+    async with tenant_session(uuid.UUID(tenant_id)) as session:
+        registry_entry = MLOpsModelRegistry(
+            tenant_id=uuid.UUID(tenant_id),
+            associated_business_question=associated_business_question,
+            model_name=champion,
+            model_version=duel_results["champion_model_version"],
+            hyperparameters_used=hyperparameters,
+            calculated_metrics_score=active_profile
+        )
+        session.add(registry_entry)
+        await session.commit()
+
+
 # Evaluation Endpoint
 @app.post(
     "/api/v1/procurement/bids/evaluate",
@@ -171,7 +209,20 @@ async def evaluate_bid(
     tenant_id: str = Depends(verify_tenant_isolation)
 ):
     try:
+        # MLOps Pipeline Wiring: Log baseline model snapshot matching active X-Tenant-ID
+        try:
+            await log_forecasting_run(
+                tenant_id=tenant_id,
+                associated_business_question="What is our baseline financial exposure if consumption patterns remain completely static, ignoring seasonality?"
+            )
+        except Exception as exc:
+            logger.error(
+                f"[ERR_MLOPS_METADATA_LOG_FAILURE] Tenant: {tenant_id} | "
+                f"Scope: evaluate_bid_mlops | Trace Context: {exc}"
+            )
+
         evaluator = CELRuleEvaluator(CONFIG)
+
         
         # 1. Process hard-stop disqualifications using CELRuleEvaluator
         # Check bank verification
@@ -386,6 +437,18 @@ class SimulationRequest(BaseModel):
 @app.post("/api/v1/procurement/simulate")
 async def simulate_scenario(req: SimulationRequest, tenant_id: str = Depends(verify_tenant_isolation)):
     try:
+        # MLOps Pipeline Wiring: Log baseline model snapshot matching active X-Tenant-ID
+        try:
+            await log_forecasting_run(
+                tenant_id=tenant_id,
+                associated_business_question="How do seasonal shocks, promotional calendars, and regional price elasticity alter our 8-day stockout horizon?"
+            )
+        except Exception as exc:
+            logger.error(
+                f"[ERR_MLOPS_METADATA_LOG_FAILURE] Tenant: {tenant_id} | "
+                f"Scope: simulate_scenario_mlops | Trace Context: {exc}"
+            )
+
         simulator = ProcurementScenarioSimulator()
         result = simulator.run_stress_test(BASELINE_REORDER_PARAMS, req.matrix.model_dump())
         return result
@@ -395,6 +458,7 @@ async def simulate_scenario(req: SimulationRequest, tenant_id: str = Depends(ver
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Scenario simulation failed: {str(e)}"
         )
+
 
 
 class ChatRequest(BaseModel):
