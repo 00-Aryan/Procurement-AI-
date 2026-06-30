@@ -1,0 +1,15 @@
+# Local AI / tool config
+.codex/
+.antigravity/
+
+# Opencode local artifacts
+.opencode/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Local environment
+.python-version
+
+.venv

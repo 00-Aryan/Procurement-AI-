@@ -1,0 +1,161 @@
+{
+  "config_meta": {
+    "schema_version": "1.0.0",
+    "config_id": "a3f9c2d1-8b47-4e3a-9f0c-2b6d5e8a1c47",
+    "industry_domain": "government_procurement",
+    "locale": {
+      "country_code": "IN",
+      "currency_code": "INR",
+      "date_format": "DD-MM-YYYY",
+      "language_code": "en-IN",
+      "fiscal_year_start_month": 4
+    },
+    "created_at": "2026-06-29T09:00:00Z",
+    "updated_at": "2026-06-29T09:00:00Z",
+    "config_status": "active",
+    "tags": ["gem", "government", "india", "gfr2017", "vehicle_hiring", "jharkhand", "ccl"]
+  },
+  "entity_mapping": {
+    "node_types": [
+      {
+        "abstract_id": "node.buyer",
+        "domain_label": "Procuring Entity",
+        "domain_plural": "Procuring Entities",
+        "role": "initiator",
+        "required_attributes": [
+          { "attribute_id": "org_name" },
+          { "attribute_id": "gem_org_id" },
+          { "attribute_id": "ministry_code" },
+          { "attribute_id": "geo_state" },
+          { "attribute_id": "buyer_category" }
+        ],
+        "optional_attributes": [
+          { "attribute_id": "pao_code" },
+          { "attribute_id": "ddo_code" },
+          { "attribute_id": "contact_email", "display_label_override": "Nodal Officer Email" }
+        ],
+        "validation_group": "procuring_entity_validators",
+        "icon_token": "building_government"
+      },
+      {
+        "abstract_id": "node.seller",
+        "domain_label": "Bidder",
+        "domain_plural": "Bidders",
+        "role": "responder",
+        "required_attributes": [
+          { "attribute_id": "seller_name" },
+          { "attribute_id": "gem_seller_id" },
+          { "attribute_id": "gstin" },
+          { "attribute_id": "msme_status" },
+          { "attribute_id": "uam_number" },
+          { "attribute_id": "past_order_value_inr" },
+          { "attribute_id": "years_of_experience" },
+          { "attribute_id": "make_in_india_class" },
+          { "attribute_id": "bank_account_verified" }
+        ],
+        "optional_attributes": [
+          { "attribute_id": "startup_india_dpiit" },
+          { "attribute_id": "iso_certifications" },
+          { "attribute_id": "pan_number" }
+        ],
+        "validation_group": "bidder_validators",
+        "icon_token": "store_front"
+      }
+    ],
+    "flow_types": [
+      {
+        "abstract_id": "flow.tender",
+        "domain_label": "Bid / Tender",
+        "domain_plural": "Tenders",
+        "initiator_node_ids": ["node.buyer"],
+        "responder_node_ids": ["node.seller"],
+        "value_unit": "currency",
+        "is_reversible": false,
+        "max_concurrency": 500
+      }
+    ],
+    "edge_types": [
+      {
+        "abstract_id": "edge.publishes",
+        "domain_label": "Procuring Entity publishes Tender",
+        "from_node_id": "node.buyer",
+        "to_node_id": "flow.tender",
+        "cardinality": "one_to_many",
+        "is_required": true
+      }
+    ],
+    "attribute_registry": {
+      "org_name": { "domain_label": "Organization Name", "data_type": "string", "constraints": { "min_length": 3, "max_length": 200 }, "is_searchable": true, "is_pii": false },
+      "gem_org_id": { "domain_label": "GeM Organization ID", "data_type": "string", "constraints": { "pattern": "^ORG[0-9]{10}$" }, "is_searchable": true, "is_pii": false },
+      "ministry_code": { "domain_label": "Ministry / Department Code", "data_type": "string", "constraints": { "min_length": 2, "max_length": 10 }, "is_searchable": true, "is_pii": false },
+      "geo_state": { "domain_label": "State", "data_type": "enum", "enum_values": ["JH", "DL", "MH"], "is_searchable": true, "is_pii": false },
+      "buyer_category": { "domain_label": "Buyer Category", "data_type": "enum", "enum_values": ["psu", "autonomous_body"], "is_searchable": true, "is_pii": false },
+      "pao_code": { "domain_label": "Pay & Accounts Office Code", "data_type": "string", "is_searchable": false, "is_pii": false },
+      "ddo_code": { "domain_label": "Drawing & Disbursing Officer Code", "data_type": "string", "is_searchable": false, "is_pii": false },
+      "contact_email": { "domain_label": "Nodal Officer Email", "data_type": "string", "constraints": { "format": "email" }, "is_searchable": false, "is_pii": true },
+      "seller_name": { "domain_label": "Seller / Business Name", "data_type": "string", "constraints": { "min_length": 2, "max_length": 200 }, "is_searchable": true, "is_pii": false },
+      "gem_seller_id": { "domain_label": "GeM Seller ID", "data_type": "string", "constraints": { "pattern": "^SEL[0-9]{10}$" }, "is_searchable": true, "is_pii": false },
+      "gstin": { "domain_label": "GSTIN", "data_type": "string", "constraints": { "pattern": "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$" }, "is_searchable": true, "is_pii": false },
+      "msme_status": { "domain_label": "MSME Registration Status", "data_type": "enum", "enum_values": ["micro","small","medium","not_registered"], "is_searchable": true, "is_pii": false },
+      "uam_number": { "domain_label": "Udyam Registration Number", "data_type": "string", "constraints": { "pattern": "^UDYAM-[A-Z]{2}-[0-9]{2}-[0-9]{7}$" }, "is_searchable": true, "is_pii": false },
+      "past_order_value_inr": { "domain_label": "Cumulative Past GeM Order Value", "data_type": "currency_amount", "constraints": { "min": 0 }, "is_searchable": false, "is_pii": false },
+      "years_of_experience": { "domain_label": "Years of Government Work Experience", "data_type": "number", "constraints": { "min": 0 }, "is_searchable": false, "is_pii": false },
+      "make_in_india_class": { "domain_label": "Make in India Classification", "data_type": "enum", "enum_values": ["class_1","class_2"], "is_searchable": true, "is_pii": false },
+      "bank_account_verified": { "domain_label": "Bank Account Verified", "data_type": "boolean", "is_searchable": false, "is_pii": false }
+    }
+  },
+  "flow_definition": {
+    "flow_type_ref": "flow.tender",
+    "initial_state": "state.draft",
+    "terminal_states": ["state.awarded", "state.cancelled"],
+    "states": [
+      { "state_id": "state.draft", "domain_label": "Tender Draft", "state_type": "draft", "allowed_actors": ["node.buyer"], "timeout_hours": 720, "timeout_action": "auto_cancel" },
+      { "state_id": "state.awarded", "domain_label": "Contract Awarded", "state_type": "terminal", "allowed_actors": [], "timeout_hours": null, "timeout_action": "hold" }
+    ],
+    "transitions": [
+      {
+        "transition_id": "trans.draft_to_awarded",
+        "from_state": "state.draft",
+        "to_state": "state.awarded",
+        "trigger_event": "buyer.issue_contract",
+        "conditions": []
+      }
+    ]
+  },
+  "risk_engine": {
+    "scoring_model": "weighted_sum",
+    "risk_dimensions": [
+      { "dimension_id": "risk.seller_experience", "domain_label": "Government Work Experience", "weight": 0.5, "scoring_function": "linear", "input_attributes": ["years_of_experience"], "invert_score": true, "normalization_range": { "min": 0, "max": 10 } },
+      { "dimension_id": "risk.regulatory_compliance", "domain_label": "GSTIN Compliance", "weight": 0.5, "scoring_function": "boolean_gate", "input_attributes": ["gstin"], "invert_score": true, "normalization_range": { "min": 0, "max": 1 } }
+    ],
+    "weight_sum_constraint": 1.0,
+    "band_thresholds": { "low": 0.0, "medium": 0.35, "high": 0.6, "critical": 0.75 },
+    "scoring_formula": "composite_score = sum(weight * value)",
+    "disqualification_gates": [
+      { "gate_id": "gate.bank_unverified", "condition": { "condition_id": "cond.bank_unverified", "expression_type": "simple_comparison", "expression": "seller.bank_account_verified = false" }, "reason_code": "DQ_BANK_UNVERIFIED" }
+    ]
+  },
+  "automation_engine": {
+    "execution_mode": "hybrid",
+    "triggers": []
+  },
+  "compliance_rules": {
+    "regulatory_framework": { "framework_id": "GFR_2017_IN", "framework_name": "General Financial Rules 2017", "jurisdiction": "IN", "version": "2017" },
+    "mandatory_fields": {
+      "node.buyer": ["org_name", "gem_org_id", "ministry_code", "geo_state", "buyer_category"],
+      "node.seller": ["seller_name", "gem_seller_id", "gstin", "msme_status", "uam_number", "bank_account_verified"]
+    },
+    "validation_rules": [
+      { "rule_id": "val.minimum_bid_window_7_days", "applies_to_entity": "flow.tender", "rule_expression": "window >= 7", "error_code": "ERR_BID_WINDOW_TOO_SHORT", "severity": "fatal" }
+    ],
+    "audit_config": { "audit_all_state_transitions": true, "audit_all_automation_actions": true, "retention_days": 365, "immutable_log": true, "pii_fields": [] }
+  },
+  "tenant_profile": {
+    "tenant_id": "f7a2b4c9-3d1e-4f8a-b5c2-9e0d1a2b3c4d",
+    "tenant_name": "Central Coalfields Limited",
+    "tier": "government",
+    "feature_flags": { "msme_price_preference": true },
+    "rate_limits": { "api_requests_per_minute": 300, "max_concurrent_flows": 50, "max_active_tenders": 25 },
+    "notification_channels": []
+  }
+}

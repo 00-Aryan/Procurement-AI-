@@ -1,0 +1,637 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenderiq.dev/schemas/industry-config/v1.0.0",
+  "title": "IndustryConfig",
+  "description": "Cross-industry configuration metaschema for the TenderIQ procurement platform. Abstracts domain logic into a portable, data-driven configuration layer that drives entity resolution, workflow state machines, risk scoring, automation triggers, and compliance validation — without backend code changes per industry.",
+  "type": "object",
+  "required": [
+    "config_meta",
+    "entity_mapping",
+    "flow_definition",
+    "risk_engine",
+    "automation_engine",
+    "compliance_rules",
+    "tenant_profile"
+  ],
+  "additionalProperties": false,
+
+  "properties": {
+
+    "config_meta": {
+      "type": "object",
+      "description": "Identity and lifecycle metadata for this configuration instance.",
+      "required": ["schema_version", "config_id", "industry_domain", "locale", "created_at", "config_status"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "SemVer string. Must match the $id version of this schema."
+        },
+        "config_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Globally unique identifier for this configuration instance. Immutable after activation."
+        },
+        "industry_domain": {
+          "type": "string",
+          "enum": [
+            "government_procurement",
+            "defense_acquisition",
+            "healthcare_supply",
+            "construction_contracting",
+            "logistics_freight",
+            "financial_services",
+            "energy_utilities",
+            "education_procurement"
+          ],
+          "description": "Top-level industry vertical. Drives default vocabulary and compliance framework selection."
+        },
+        "locale": {
+          "type": "object",
+          "description": "Regionalisation settings affecting currency, date rendering, and regulatory defaults.",
+          "required": ["country_code", "currency_code", "date_format", "language_code"],
+          "additionalProperties": false,
+          "properties": {
+            "country_code":           { "type": "string", "pattern": "^[A-Z]{2}$", "description": "ISO 3166-1 alpha-2" },
+            "currency_code":          { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217" },
+            "date_format":            { "type": "string", "description": "Display date format, e.g. DD-MM-YYYY" },
+            "language_code":          { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$", "description": "IETF BCP 47" },
+            "fiscal_year_start_month":{ "type": "integer", "minimum": 1, "maximum": 12 }
+          }
+        },
+        "created_at":    { "type": "string", "format": "date-time" },
+        "updated_at":    { "type": "string", "format": "date-time" },
+        "config_status": { "type": "string", "enum": ["draft", "active", "deprecated", "archived"] },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+
+    "entity_mapping": {
+      "type": "object",
+      "description": "Maps abstract platform concepts (Node, Flow, Edge) to domain-specific vocabulary. This is the primary abstraction layer — change this block to redeploy the platform in a new industry.",
+      "required": ["node_types", "flow_types", "edge_types", "attribute_registry"],
+      "additionalProperties": false,
+      "properties": {
+
+        "node_types": {
+          "type": "array",
+          "description": "Abstract 'Node' instantiates as domain actors or physical entities (e.g., Supplier, Bidder, Facility).",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["abstract_id", "domain_label", "domain_plural", "role", "required_attributes", "optional_attributes"],
+            "additionalProperties": false,
+            "properties": {
+              "abstract_id":          { "type": "string", "pattern": "^node\\.[a-z_]+$" },
+              "domain_label":         { "type": "string", "minLength": 2 },
+              "domain_plural":        { "type": "string", "minLength": 2 },
+              "role": {
+                "type": "string",
+                "enum": ["initiator", "responder", "evaluator", "observer", "system"],
+                "description": "Functional role in the procurement flow."
+              },
+              "required_attributes": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/AttributeRef" }
+              },
+              "optional_attributes": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/AttributeRef" }
+              },
+              "validation_group": { "type": "string", "description": "Key into the compliance_rules.validation_rules array for entity-scoped rules." },
+              "icon_token":       { "type": "string", "description": "Design-system icon token for UI rendering." }
+            }
+          }
+        },
+
+        "flow_types": {
+          "type": "array",
+          "description": "Abstract 'Flow' instantiates as a domain transaction process (e.g., Tender, Purchase Order, RFQ).",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["abstract_id", "domain_label", "domain_plural", "initiator_node_ids", "responder_node_ids"],
+            "additionalProperties": false,
+            "properties": {
+              "abstract_id":          { "type": "string", "pattern": "^flow\\.[a-z_]+$" },
+              "domain_label":         { "type": "string", "minLength": 2 },
+              "domain_plural":        { "type": "string", "minLength": 2 },
+              "initiator_node_ids": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^node\\.[a-z_]+$" },
+                "minItems": 1
+              },
+              "responder_node_ids": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^node\\.[a-z_]+$" }
+              },
+              "value_unit": {
+                "type": "string",
+                "enum": ["currency", "quantity", "score", "percentage", "none"]
+              },
+              "is_reversible":    { "type": "boolean" },
+              "max_concurrency":  { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+
+        "edge_types": {
+          "type": "array",
+          "description": "Abstract 'Edge' instantiates as directed relationships between node types in the supply network.",
+          "items": {
+            "type": "object",
+            "required": ["abstract_id", "domain_label", "from_node_id", "to_node_id", "cardinality"],
+            "additionalProperties": false,
+            "properties": {
+              "abstract_id":   { "type": "string", "pattern": "^edge\\.[a-z_]+$" },
+              "domain_label":  { "type": "string" },
+              "from_node_id":  { "type": "string", "pattern": "^node\\.[a-z_]+$" },
+              "to_node_id":    { "type": "string", "pattern": "^(node|flow)\\.[a-z_]+$" },
+              "cardinality":   { "type": "string", "enum": ["one_to_one", "one_to_many", "many_to_many"] },
+              "is_required":   { "type": "boolean" }
+            }
+          }
+        },
+
+        "attribute_registry": {
+          "type": "object",
+          "description": "Central registry of all attributes referenced by node_types and flow_types. Keys are attribute_ids; values are full definitions.",
+          "additionalProperties": { "$ref": "#/$defs/AttributeDefinition" }
+        }
+
+      }
+    },
+
+    "flow_definition": {
+      "type": "object",
+      "description": "Declarative state machine governing the lifecycle of the primary procurement Flow.",
+      "required": ["flow_type_ref", "initial_state", "terminal_states", "states", "transitions"],
+      "additionalProperties": false,
+      "properties": {
+        "flow_type_ref": {
+          "type": "string",
+          "pattern": "^flow\\.[a-z_]+$",
+          "description": "Must reference a flow_types[*].abstract_id in entity_mapping."
+        },
+        "initial_state":  { "type": "string", "description": "state_id of the entry point state." },
+        "terminal_states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "state_ids from which no outgoing transitions are defined."
+        },
+        "rollback_eligible_states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "state_ids from which a rollback transition is permitted."
+        },
+        "states": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["state_id", "domain_label", "state_type", "allowed_actors", "timeout_hours"],
+            "additionalProperties": false,
+            "properties": {
+              "state_id":       { "type": "string", "pattern": "^state\\.[a-z_]+$" },
+              "domain_label":   { "type": "string" },
+              "state_type": {
+                "type": "string",
+                "enum": ["draft", "active", "pending", "evaluation", "terminal", "error"]
+              },
+              "allowed_actors": {
+                "type": "array",
+                "items": { "type": "string", "pattern": "^node\\.[a-z_]+$" },
+                "description": "node_type abstract_ids permitted to act in this state."
+              },
+              "timeout_hours": {
+                "type": ["integer", "null"],
+                "minimum": 0,
+                "description": "Hours until timeout_action fires. null = no timeout."
+              },
+              "timeout_action": {
+                "type": "string",
+                "enum": ["auto_advance", "auto_cancel", "escalate", "hold"]
+              },
+              "requires_approval":   { "type": "boolean" },
+              "approval_actor_id":   { "type": ["string", "null"] },
+              "sla_hours":           { "type": ["integer", "null"], "description": "Soft SLA in hours — breach triggers alert, not auto-action." },
+              "metadata":            { "type": "object", "description": "Domain-specific opaque data (e.g., portal status codes, UI flags)." }
+            }
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["transition_id", "from_state", "to_state", "trigger_event", "conditions"],
+            "additionalProperties": false,
+            "properties": {
+              "transition_id":  { "type": "string", "pattern": "^trans\\.[a-z_]+$" },
+              "from_state":     { "type": "string", "description": "Must reference a valid state_id." },
+              "to_state":       { "type": "string", "description": "Must reference a valid state_id." },
+              "trigger_event":  { "type": "string", "description": "Namespaced event string, e.g. 'buyer.submit_for_approval' or 'system.bid_deadline_reached'." },
+              "conditions": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/Condition" },
+                "description": "ALL conditions must evaluate true (implicit AND) for the transition to proceed."
+              },
+              "pre_actions": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/Action" },
+                "description": "Actions executed before state changes. Failure here can rollback."
+              },
+              "post_actions": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/Action" },
+                "description": "Actions executed after state change is committed."
+              },
+              "rollback_on_failure": { "type": "boolean" },
+              "audit_required":      { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+
+    "risk_engine": {
+      "type": "object",
+      "description": "Weighted multi-dimensional risk/eligibility scoring engine. Drives both soft scoring and hard disqualification gates.",
+      "required": ["scoring_model", "risk_dimensions", "band_thresholds", "scoring_formula"],
+      "additionalProperties": false,
+      "properties": {
+        "scoring_model": {
+          "type": "string",
+          "enum": ["weighted_sum", "weighted_product", "min_max_normalized", "custom_expression"]
+        },
+        "risk_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Weights must sum to 1.0 (enforced by weight_sum_constraint).",
+          "items": {
+            "type": "object",
+            "required": ["dimension_id", "domain_label", "weight", "scoring_function", "input_attributes"],
+            "additionalProperties": false,
+            "properties": {
+              "dimension_id":     { "type": "string" },
+              "domain_label":     { "type": "string" },
+              "weight": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Fractional weight. All dimension weights must sum to weight_sum_constraint."
+              },
+              "scoring_function": {
+                "type": "string",
+                "enum": ["linear", "inverse_linear", "step", "logarithmic", "boolean_gate"]
+              },
+              "input_attributes": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "attribute_registry keys consumed by the scoring function."
+              },
+              "invert_score": {
+                "type": "boolean",
+                "description": "If true: lower raw value = higher risk score (e.g., less experience = more risk)."
+              },
+              "normalization_range": {
+                "type": "object",
+                "required": ["min", "max"],
+                "properties": {
+                  "min": { "type": "number" },
+                  "max": { "type": "number" }
+                },
+                "description": "Raw score is linearly normalized to [0, 1] using this range."
+              }
+            }
+          }
+        },
+        "weight_sum_constraint": {
+          "type": "number",
+          "const": 1.0,
+          "description": "Schema-enforced constant. Implementors must verify SUM(weights) = 1.0 at config load time."
+        },
+        "band_thresholds": {
+          "type": "object",
+          "required": ["low", "medium", "high", "critical"],
+          "additionalProperties": false,
+          "description": "Composite score [0, 1] band boundaries. Scores are read as: low <= score < medium, medium <= score < high, etc.",
+          "properties": {
+            "low":      { "type": "number", "minimum": 0 },
+            "medium":   { "type": "number" },
+            "high":     { "type": "number" },
+            "critical": { "type": "number", "maximum": 1 }
+          }
+        },
+        "scoring_formula": {
+          "type": "string",
+          "description": "Human-readable or JSONata expression documenting how composite_score is derived from dimension scores."
+        },
+        "disqualification_gates": {
+          "type": "array",
+          "description": "Hard-stop rules. Evaluated BEFORE soft scoring. A matching gate immediately disqualifies regardless of risk score.",
+          "items": {
+            "type": "object",
+            "required": ["gate_id", "condition", "reason_code"],
+            "additionalProperties": false,
+            "properties": {
+              "gate_id":        { "type": "string" },
+              "condition":      { "$ref": "#/$defs/Condition" },
+              "reason_code":    { "type": "string", "description": "Machine-readable disqualification code surfaced to buyer UI and audit log." },
+              "is_overridable": { "type": "boolean", "description": "If true, a senior approver can manually override this gate." }
+            }
+          }
+        }
+      }
+    },
+
+    "automation_engine": {
+      "type": "object",
+      "description": "Event-driven and schedule-driven automation layer. Triggers fire conditions and dispatch action chains.",
+      "required": ["execution_mode", "triggers"],
+      "additionalProperties": false,
+      "properties": {
+        "execution_mode": {
+          "type": "string",
+          "enum": ["synchronous", "asynchronous", "hybrid"],
+          "description": "synchronous: trigger blocks until all actions complete. asynchronous: trigger enqueues and returns immediately. hybrid: pre_actions sync, post_actions async."
+        },
+        "retry_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_attempts":       { "type": "integer", "minimum": 1 },
+            "backoff_strategy":   { "type": "string", "enum": ["fixed", "linear", "exponential"] },
+            "base_delay_seconds": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "fallback_behavior": {
+          "type": "string",
+          "enum": ["manual_review", "reject", "hold", "escalate"],
+          "description": "Global fallback when a trigger's action chain exhausts retries."
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["trigger_id", "trigger_type", "event_source", "conditions", "actions", "priority"],
+            "additionalProperties": false,
+            "properties": {
+              "trigger_id": { "type": "string" },
+              "trigger_type": {
+                "type": "string",
+                "enum": ["event_based", "schedule_based", "threshold_based", "manual"]
+              },
+              "event_source":    { "type": "string", "description": "Namespaced event or scheduler identifier." },
+              "schedule_cron":   { "type": ["string", "null"], "description": "POSIX cron expression. Required when trigger_type = schedule_based." },
+              "conditions": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/Condition" }
+              },
+              "actions": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/Action" },
+                "minItems": 1
+              },
+              "priority":  { "type": "integer", "minimum": 1, "maximum": 100, "description": "Lower number = higher priority when multiple triggers fire simultaneously." },
+              "is_active": { "type": "boolean" },
+              "rate_limit": {
+                "type": ["object", "null"],
+                "additionalProperties": false,
+                "properties": {
+                  "max_executions": { "type": "integer" },
+                  "window_seconds": { "type": "integer" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "compliance_rules": {
+      "type": "object",
+      "description": "Regulatory framework binding, mandatory field declarations, validation rule set, and audit configuration.",
+      "required": ["regulatory_framework", "mandatory_fields", "validation_rules", "audit_config"],
+      "additionalProperties": false,
+      "properties": {
+
+        "regulatory_framework": {
+          "type": "object",
+          "required": ["framework_id", "framework_name", "jurisdiction", "version"],
+          "additionalProperties": false,
+          "properties": {
+            "framework_id":   { "type": "string" },
+            "framework_name": { "type": "string" },
+            "jurisdiction":   { "type": "string", "description": "ISO 3166-1 country code or sub-national code." },
+            "version":        { "type": "string" },
+            "effective_date": { "type": "string", "format": "date" },
+            "reference_urls": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+
+        "mandatory_fields": {
+          "type": "object",
+          "description": "Maps entity abstract_id to a list of required attribute_registry keys. Failure = fatal validation error.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+
+        "validation_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["rule_id", "applies_to_entity", "rule_expression", "error_code", "severity"],
+            "additionalProperties": false,
+            "properties": {
+              "rule_id":                  { "type": "string" },
+              "applies_to_entity":        { "type": "string", "description": "Abstract entity id this rule validates." },
+              "rule_expression":          { "type": "string", "description": "JSONata or CEL expression returning boolean." },
+              "error_code":               { "type": "string" },
+              "error_message_template":   { "type": "string" },
+              "severity": {
+                "type": "string",
+                "enum": ["info", "warning", "error", "fatal"]
+              },
+              "is_blocking": { "type": "boolean", "description": "If true, flow cannot advance past current state until this rule passes." }
+            }
+          }
+        },
+
+        "audit_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "audit_all_state_transitions":    { "type": "boolean" },
+            "audit_all_automation_actions":   { "type": "boolean" },
+            "retention_days":                 { "type": "integer", "minimum": 1 },
+            "immutable_log":                  { "type": "boolean", "description": "If true, audit entries are write-once (append-only)." },
+            "pii_fields": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "attribute_registry keys to be masked/pseudonymised in audit logs."
+            }
+          }
+        }
+
+      }
+    },
+
+    "tenant_profile": {
+      "type": "object",
+      "description": "Multi-tenant identity, feature gate, and rate-limit configuration. Supports hierarchical tenant inheritance via parent_tenant_id.",
+      "required": ["tenant_id", "tenant_name", "tier", "feature_flags"],
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id":        { "type": "string", "format": "uuid" },
+        "tenant_name":      { "type": "string" },
+        "tier": {
+          "type": "string",
+          "enum": ["starter", "professional", "enterprise", "government"]
+        },
+        "parent_tenant_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "If set, unspecified config keys inherit from the parent tenant's config."
+        },
+        "feature_flags": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" },
+          "description": "Boolean feature toggles. Unknown keys are silently ignored (forward-compatible)."
+        },
+        "config_overrides": {
+          "type": "object",
+          "description": "Sparse dot-notation override map. Only specified paths override the base config. Applied after schema validation.",
+          "additionalProperties": true
+        },
+        "rate_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "api_requests_per_minute": { "type": "integer" },
+            "max_concurrent_flows":    { "type": "integer" },
+            "max_active_tenders":      { "type": "integer" }
+          }
+        },
+        "notification_channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["channel_type", "endpoint"],
+            "additionalProperties": false,
+            "properties": {
+              "channel_type": { "type": "string", "enum": ["email", "sms", "webhook", "push", "in_app"] },
+              "endpoint":     { "type": "string" },
+              "events": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Event names that route to this channel. Empty array = all events."
+              }
+            }
+          }
+        }
+      }
+    }
+
+  },
+
+  "$defs": {
+
+    "AttributeRef": {
+      "type": "object",
+      "required": ["attribute_id"],
+      "additionalProperties": false,
+      "properties": {
+        "attribute_id":           { "type": "string", "description": "Must match a key in entity_mapping.attribute_registry." },
+        "display_label_override": { "type": "string", "description": "Overrides the registry domain_label for this specific node_type context." },
+        "is_pii":                 { "type": "boolean" }
+      }
+    },
+
+    "AttributeDefinition": {
+      "type": "object",
+      "required": ["data_type", "domain_label"],
+      "additionalProperties": false,
+      "properties": {
+        "domain_label": { "type": "string" },
+        "data_type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "date", "date-time", "enum", "array", "object", "document_ref", "currency_amount"]
+        },
+        "enum_values":    { "type": "array", "items": { "type": "string" } },
+        "constraints": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min":        { "type": "number" },
+            "max":        { "type": "number" },
+            "min_length": { "type": "integer" },
+            "max_length": { "type": "integer" },
+            "pattern":    { "type": "string" },
+            "format":     { "type": "string" }
+          }
+        },
+        "is_searchable": { "type": "boolean" },
+        "is_pii":        { "type": "boolean" }
+      }
+    },
+
+    "Condition": {
+      "type": "object",
+      "required": ["condition_id", "expression_type", "expression"],
+      "additionalProperties": false,
+      "properties": {
+        "condition_id": { "type": "string" },
+        "expression_type": {
+          "type": "string",
+          "enum": ["jsonata", "cel", "simple_comparison", "composite_and", "composite_or"]
+        },
+        "expression":      { "type": "string", "description": "Evaluates to boolean. For composite types, a human-readable label; sub_conditions carries the logic." },
+        "sub_conditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Condition" },
+          "description": "Only used when expression_type is composite_and or composite_or."
+        },
+        "description": { "type": "string" }
+      }
+    },
+
+    "Action": {
+      "type": "object",
+      "required": ["action_id", "action_type"],
+      "additionalProperties": false,
+      "properties": {
+        "action_id": { "type": "string" },
+        "action_type": {
+          "type": "string",
+          "enum": [
+            "send_notification",
+            "update_flow_state",
+            "compute_risk_score",
+            "generate_document",
+            "invoke_webhook",
+            "create_audit_entry",
+            "flag_for_review",
+            "publish_to_portal",
+            "assign_evaluator",
+            "expire_flow"
+          ]
+        },
+        "parameters": { "type": "object", "description": "Action-type-specific parameter bag. Schema enforcement delegated to action executor." },
+        "on_failure":  { "type": "string", "enum": ["retry", "skip", "abort", "escalate"] }
+      }
+    }
+
+  }
+}
