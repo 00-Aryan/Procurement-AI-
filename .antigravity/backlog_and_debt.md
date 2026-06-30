@@ -46,6 +46,7 @@
 - [x] D2: Production docker-compose network bridge configuration
 - [x] D3: Production environmental hardening and startup safety validations
 - [x] D4: CI/CD configuration files and workspace build verification
+- [x] D5: Cloud Readiness: dynamic port binding, Next.js environment splits, and render.yaml blueprint
 
 ## Confirmed Post-MVP Backlog (Version 2.0 / Scale)
 - [ ] B1: Dynamic multi-tier GNN risk propagation tracking across public market layers

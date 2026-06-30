@@ -15,11 +15,11 @@ import {
   Globe,
   Database
 } from "lucide-react";
+import { BACKEND_URL } from "@/lib/api";
 import { GatewayGovernanceError, throwGatewayGovernanceError } from "@/lib/gatewayErrors";
 import type { GatewayGovernanceBoundary } from "@/lib/gatewayErrors";
 
 const DEFAULT_TENANT_ID = "f7a2b4c9-3d1e-4f8a-b5c2-9e0d1a2b3c4d";
-const BACKEND_URL = "http://127.0.0.1:8000";
 
 export type UploadStatus = "idle" | "selected" | "uploading" | "processing" | "success" | "error";
 

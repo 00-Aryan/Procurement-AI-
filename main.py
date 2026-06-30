@@ -736,3 +736,16 @@ async def ingest_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An internal error occurred during history ingestion: {str(e)}"
         )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port_env = os.getenv("PORT", "8000")
+    try:
+        port = int(port_env)
+    except ValueError:
+        logger.error(f"Invalid PORT environment variable '{port_env}', defaulting to 8000")
+        port = 8000
+    
+    logger.info(f"Starting production worker loop binding to port: {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=4)

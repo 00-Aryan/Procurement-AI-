@@ -1,6 +1,7 @@
 import { Lightbulb, Sparkles } from "lucide-react";
 
 import { GovernanceBoundaryAlert } from "@/components/GovernanceBoundaryAlert";
+import { BACKEND_URL } from "@/lib/api";
 import { GatewayGovernanceError, throwGatewayGovernanceError } from "@/lib/gatewayErrors";
 import type { GatewayGovernanceBoundary } from "@/lib/gatewayErrors";
 
@@ -23,7 +24,7 @@ const FALLBACK_RECOMMENDATIONS: Recommendation[] = [
 
 async function fetchRecommendations(): Promise<RecommendationsFetchResult> {
   try {
-    const res = await fetch("http://127.0.0.1:8000/api/v1/procurement/recommendations", {
+    const res = await fetch(`${BACKEND_URL}/api/v1/procurement/recommendations`, {
       headers: {
         "X-Tenant-ID": DEFAULT_TENANT_ID,
       },
