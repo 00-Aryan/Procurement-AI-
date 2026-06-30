@@ -21,7 +21,6 @@ ENV NODE_ENV=production
 COPY --from=builder /app/web/package.json /app/web/package-lock.json ./
 COPY --from=builder /app/web/node_modules ./node_modules
 COPY --from=builder /app/web/.next ./.next
-COPY --from=builder /app/web/public ./public
 COPY --from=builder /app/industry-config.json /app/industry-config.json
 
 EXPOSE 3001

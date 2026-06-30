@@ -1,28 +1,33 @@
-FROM python:3.14-alpine
+FROM python:3.12-slim
 
-# Install build dependencies for compiling Python packages (e.g. Stan, scipy, prophet)
-RUN apk add --no-cache gcc g++ musl-dev python3-dev libffi-dev libstdc++ gfortran openblas-dev
+# Install system utilities needed for runtime execution (e.g., git/curl if required, clean footprint)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install uv natively
+# Install uv cleanly using the official optimized multi-stage binary copy method
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 
 WORKDIR /app
 
-# Copy dependency configuration and lockfile
-COPY pyproject.toml uv.lock ./
+# Enable bytecode compilation for optimal container startup latency
+ENV UV_COMPILE_BYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Synchronize python dependencies exactly from lockfile
-RUN uv sync --frozen
+# Synchronize dependencies using lock file tracking
+COPY pyproject.toml uv.lock /app/
+RUN uv sync --frozen --no-dev
 
-# Copy source files
-COPY main.py ./
-COPY core/ ./core/
-COPY infra/ ./infra/
-COPY scripts/ ./scripts/
-COPY industry-config.json ./
+# Copy active production application space
+COPY main.py /app/
+COPY core/ /app/core/
+COPY infra/ /app/infra/
+COPY scripts/ /app/scripts/
+COPY industry-config.json /app/
 
-# Expose backend port
+
 EXPOSE 8000
 
-# Execute server using uvicorn via uv run context
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
