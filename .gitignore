@@ -25,3 +25,5 @@ server.log
 
 validation_logs
 core/.env
+
+.env.production

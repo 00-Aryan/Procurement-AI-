@@ -14,6 +14,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -34,8 +35,23 @@ class DatabaseLayerError(Exception):
     pass
 
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
+def normalize_asyncpg_database_url(raw_url: str) -> tuple[str, dict[str, Any]]:
+    if raw_url.startswith("postgresql://"):
+        normalized_url = raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif raw_url.startswith("postgres://"):
+        normalized_url = raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    else:
+        normalized_url = raw_url
+
+    parsed_url = make_url(normalized_url)
+    query = dict(parsed_url.query)
+    sslmode = query.pop("sslmode", None)
+    connect_args = {"ssl": sslmode} if sslmode else {}
+    return parsed_url.set(query=query).render_as_string(hide_password=False), connect_args
+
+
+raw_db_url = os.getenv("DATABASE_URL")
+if not raw_db_url:
     if os.getenv("ENV_MODE") == "production":
         from core.config_parser import log_and_raise, ProcurementException
         class SecurityConfigurationError(ProcurementException):
@@ -48,12 +64,15 @@ if not DATABASE_URL:
             "Production environment detected but vital DATABASE_URL is missing."
         )
     else:
-        DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/aegisprocure"
+        raw_db_url = "postgresql+asyncpg://postgres:postgres@localhost:5432/procuremind"
+
+DATABASE_URL, DATABASE_CONNECT_ARGS = normalize_asyncpg_database_url(raw_db_url)
 
 
 # Async engine creation with connection pool checking enabled
 engine = create_async_engine(
     DATABASE_URL,
+    connect_args=DATABASE_CONNECT_ARGS,
     echo=False,
     pool_pre_ping=True
 )
@@ -264,4 +283,3 @@ class MLOpsModelRegistry(Base):
 
 
 # ponytail: GIN indexes removed (DEBT-003)
-
