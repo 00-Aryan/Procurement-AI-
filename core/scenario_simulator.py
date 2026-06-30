@@ -74,36 +74,79 @@ class ProcurementScenarioSimulator:
 
     def run_stress_test(self, baseline_params: dict[str, Any], perturbation_matrix: dict[str, Any]) -> dict[str, Any]:
         baseline = self._parse_baseline(baseline_params)
-        stress = self._parse_stress_factors(perturbation_matrix)
-        stressed = self._apply_perturbations(baseline, stress)
-        optimizer = SmartReorderOptimizer()
+        scenarios = self._scenario_items(perturbation_matrix)
+        scenario_results = []
 
-        try:
-            baseline_output = optimizer.calculate_optimal_order(**baseline.model_dump())
-            stressed_output = optimizer.calculate_optimal_order(**stressed.model_dump())
-        except ReorderOptimizationError as exc:
-            raise ScenarioSimulationError(f"Reorder optimization failed during scenario simulation: {exc}") from exc
+        for scenario_name, scenario_matrix in scenarios:
+            stress = self._parse_stress_factors(scenario_matrix)
+            stressed = self._apply_perturbations(baseline, stress)
+            optimizer = SmartReorderOptimizer()
 
-        baseline_tco = float(baseline_output.get("projected_total_cost_of_ownership", 0.0))
-        stressed_tco = float(stressed_output.get("projected_total_cost_of_ownership", 0.0))
-        baseline_order = float(baseline_output.get("recommended_order_quantity", 0.0))
-        stressed_order = float(stressed_output.get("recommended_order_quantity", 0.0))
-        cost_delta = stressed_tco - baseline_tco
-        stockout = self._stockout_risk(stressed, stress, stressed_order)
+            try:
+                baseline_output = optimizer.calculate_optimal_order(**baseline.model_dump())
+                stressed_output = optimizer.calculate_optimal_order(**stressed.model_dump())
+            except ReorderOptimizationError as exc:
+                raise ScenarioSimulationError(f"Reorder optimization failed during scenario simulation: {exc}") from exc
 
+            baseline_tco = float(baseline_output.get("projected_total_cost_of_ownership", 0.0))
+            stressed_tco = float(stressed_output.get("projected_total_cost_of_ownership", 0.0))
+            baseline_order = float(baseline_output.get("recommended_order_quantity", 0.0))
+            stressed_order = float(stressed_output.get("recommended_order_quantity", 0.0))
+            cost_delta = stressed_tco - baseline_tco
+            stockout = self._stockout_risk(stressed, stress, stressed_order)
+
+            scenario_results.append(
+                {
+                    "scenario_name": scenario_name,
+                    "baseline_parameters": baseline.model_dump(),
+                    "stressed_parameters": stressed.model_dump(),
+                    "baseline_optimization": baseline_output,
+                    "stressed_optimization": stressed_output,
+                    "baseline_order_volume": round(baseline_order, 6),
+                    "stressed_order_volume": round(stressed_order, 6),
+                    "calculated_financial_delta": round(cost_delta, 6),
+                    "stockout_hazard_scale": stockout["level"],
+                    "deltas": {
+                        "recommended_order_quantity_delta": round(stressed_order - baseline_order, 6),
+                        "projected_cost_increase": round(cost_delta, 6),
+                        "projected_cost_increase_percent": round((cost_delta / baseline_tco) * 100.0, 6) if baseline_tco else 0.0,
+                        "lead_time_delta_days": stressed.lead_time_days - baseline.lead_time_days,
+                    },
+                    "stockout_risk": stockout,
+                }
+            )
+
+        if len(scenario_results) == 1:
+            return scenario_results[0]
         return {
             "baseline_parameters": baseline.model_dump(),
-            "stressed_parameters": stressed.model_dump(),
-            "baseline_optimization": baseline_output,
-            "stressed_optimization": stressed_output,
-            "deltas": {
-                "recommended_order_quantity_delta": round(stressed_order - baseline_order, 6),
-                "projected_cost_increase": round(cost_delta, 6),
-                "projected_cost_increase_percent": round((cost_delta / baseline_tco) * 100.0, 6) if baseline_tco else 0.0,
-                "lead_time_delta_days": stressed.lead_time_days - baseline.lead_time_days,
-            },
-            "stockout_risk": stockout,
+            "scenario_results": scenario_results,
+            "highest_stockout_hazard_scale": self._highest_hazard_scale(scenario_results),
         }
+
+    def _scenario_items(self, perturbation_matrix: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+        if perturbation_matrix is None:
+            return [("default", {})]
+        if not isinstance(perturbation_matrix, dict):
+            raise ScenarioSimulationError("perturbation_matrix must be a dictionary.")
+
+        matrix = perturbation_matrix.get("scenarios")
+        if matrix is None:
+            return [(str(perturbation_matrix.get("scenario_name", "default")), perturbation_matrix)]
+        if isinstance(matrix, dict):
+            return [(str(name), self._ensure_scenario_dict(value, str(name))) for name, value in matrix.items()]
+        if isinstance(matrix, list):
+            scenarios = []
+            for index, value in enumerate(matrix, start=1):
+                scenario = self._ensure_scenario_dict(value, f"scenario_{index}")
+                scenarios.append((str(scenario.get("scenario_name", f"scenario_{index}")), scenario))
+            return scenarios
+        raise ScenarioSimulationError("perturbation_matrix['scenarios'] must be a dictionary or list.")
+
+    def _ensure_scenario_dict(self, value: Any, scenario_name: str) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            raise ScenarioSimulationError(f"Scenario '{scenario_name}' must be a dictionary.")
+        return value
 
     def _parse_baseline(self, baseline_params: dict[str, Any]) -> ReorderBaselineParams:
         if not isinstance(baseline_params, dict):
@@ -162,14 +205,12 @@ class ProcurementScenarioSimulator:
         post_receipt_gap = max(0.0, demand_cover_required - stressed.current_inventory - recommended_order_quantity)
         coverage_ratio = stressed.current_inventory / demand_cover_required if demand_cover_required else 1.0
 
-        if post_receipt_gap > 0.0 or coverage_ratio < 0.5:
-            level = "critical"
-        elif coverage_ratio < 0.8:
-            level = "high"
+        if post_receipt_gap > 0.0 or coverage_ratio < 0.8:
+            level = "HIGH"
         elif coverage_ratio < 1.0 or (stress.lead_time_delay_days > 0 and coverage_ratio < 1.25):
-            level = "medium"
+            level = "MEDIUM"
         else:
-            level = "low"
+            level = "LOW"
 
         drivers = []
         if stress.demand_multiplier > 1.0 or stress.demand_delta > 0.0:
@@ -188,3 +229,12 @@ class ProcurementScenarioSimulator:
             "post_receipt_inventory_gap": round(post_receipt_gap, 6),
             "drivers": drivers,
         }
+
+    def _highest_hazard_scale(self, scenario_results: list[dict[str, Any]]) -> str:
+        rank = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
+        highest = "LOW"
+        for result in scenario_results:
+            scale = str(result.get("stockout_hazard_scale", "LOW"))
+            if rank.get(scale, 0) > rank[highest]:
+                highest = scale
+        return highest
