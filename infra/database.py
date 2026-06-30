@@ -71,9 +71,10 @@ async def tenant_session(tenant_id: Optional[uuid.UUID]) -> AsyncGenerator[Async
     try:
         # Precede transaction initialization to lock RLS filters at the engine layer
         await session.execute(
-            text("SET LOCAL app.current_tenant_id = :tenant_id"),
+            text("SELECT set_config('app.current_tenant_id', :tenant_id, true)"),
             {"tenant_id": str(tenant_id)}
         )
+
         yield session
         await session.commit()
     except (SQLAlchemyError, TimeoutError) as e:
@@ -98,9 +99,7 @@ class Tenant(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()"), nullable=False)
 
-    users: Mapped[list["User"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
-    nodes: Mapped[list["Node"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
-    flows: Mapped[list["Flow"]] = relationship(back_populates="tenant", cascade="all, delete-orphan")
+    # ponytail: stripped unused bidirectional relationship lists (DEBT-003)
 
 
 class User(Base):
@@ -114,7 +113,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()"), nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="users")
+    tenant: Mapped["Tenant"] = relationship()
 
 
 class Node(Base):
@@ -141,7 +140,7 @@ class Node(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()"), nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="nodes")
+    tenant: Mapped["Tenant"] = relationship()
 
 
 class Flow(Base):
@@ -168,14 +167,46 @@ class Flow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), onupdate=text("now()"), nullable=False)
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="flows")
+    tenant: Mapped["Tenant"] = relationship()
 
     source_node: Mapped["Node"] = relationship("Node", foreign_keys=[source_node_id])
     target_node: Mapped["Node"] = relationship("Node", foreign_keys=[target_node_id])
 
 
-# Explicit database indexes layout (using GIN indexes for JSONB fields)
-Index("idx_nodes_industry_attributes", Node.industry_attributes, postgresql_using="gin")
-Index("idx_nodes_dynamic_manifest", Node.dynamic_manifest, postgresql_using="gin")
-Index("idx_flows_industry_attributes", Flow.industry_attributes, postgresql_using="gin")
-Index("idx_flows_dynamic_manifest", Flow.dynamic_manifest, postgresql_using="gin")
+class SessionStateRegistry(Base):
+    __tablename__ = "session_state_registry"
+
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_history: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, 
+        nullable=False, 
+        server_default=text("'[]'::jsonb")
+    )
+    cached_telemetry_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, 
+        nullable=False, 
+        server_default=text("'{}'::jsonb")
+    )
+
+    tenant: Mapped["Tenant"] = relationship()
+
+
+class StagedIngestion(Base):
+    __tablename__ = "staged_ingestion"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    vector_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+
+    tenant: Mapped["Tenant"] = relationship()
+
+
+# ponytail: GIN indexes removed (DEBT-003)
+
