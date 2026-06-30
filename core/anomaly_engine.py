@@ -11,8 +11,10 @@ try:
 except ImportError:
     IsolationForest = None
 
+from core.config_parser import AnomalyEngineException, log_and_raise
 
-class ProcurementAnomalyEngineError(Exception):
+
+class ProcurementAnomalyEngineError(AnomalyEngineException):
     """Raised when anomaly model construction or scoring cannot be completed."""
 
 
@@ -163,7 +165,14 @@ class ProcurementAnomalyEngine:
                 explicit_off_contract=explicit_off_contract,
             )
         except (TypeError, ValueError, ValidationError) as exc:
-            raise ProcurementAnomalyEngineError(f"Invalid transaction feature payload: {exc}") from exc
+            log_and_raise(
+                ProcurementAnomalyEngineError,
+                "ERR_ANOMALY_FEATURE_EXTRACTION",
+                "SYSTEM_GLOBAL",
+                "_extract_features",
+                f"Invalid transaction feature payload: {exc}",
+                exc
+            )
 
     def _fit_vendor_target_encoding(self, records: list[TransactionFeatures]) -> None:
         grouped_targets: dict[str, list[float]] = defaultdict(list)

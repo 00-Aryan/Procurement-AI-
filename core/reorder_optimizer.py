@@ -8,8 +8,10 @@ try:
 except ImportError:
     linprog = None
 
+from core.config_parser import ReorderOptimizerException, log_and_raise
 
-class ReorderOptimizationError(Exception):
+
+class ReorderOptimizationError(ReorderOptimizerException):
     """Raised when reorder optimization inputs or solver output are invalid."""
 
 
@@ -61,7 +63,14 @@ class SmartReorderOptimizer:
                 ordering_cost=ordering_cost,
             )
         except ValueError as exc:
-            raise ReorderOptimizationError(f"Invalid reorder optimization inputs: {exc}") from exc
+            log_and_raise(
+                ReorderOptimizationError,
+                "ERR_REORDER_INVALID_INPUTS",
+                "SYSTEM_GLOBAL",
+                "calculate_optimal_order",
+                f"Invalid reorder optimization inputs: {exc}",
+                exc
+            )
 
         required_coverage = max(
             0.0,

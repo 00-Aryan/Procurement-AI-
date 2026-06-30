@@ -2,9 +2,9 @@ import asyncio
 import os
 import sys
 import uuid
+import random
+import string
 from datetime import datetime, timezone
-import numpy as np
-import pandas as pd
 from sqlalchemy import text
 
 # Ensure root of project is in sys.path
@@ -23,22 +23,21 @@ from infra.database import (
 
 def generate_jharkhand_gstin() -> str:
     """Generates a random valid GSTIN with state code 20 (Jharkhand)."""
-    pan_letters = "".join(np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"), size=5))
-    pan_numbers = "".join(np.random.choice(list("0123456789"), size=4))
-    entity_indicator = np.random.choice(list("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-    entity_number = np.random.choice(list("123456789"))
-    check_digit = np.random.choice(list("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    # ponytail: replaced np.random.choice with native random.choices/choice (DEBT-004)
+    pan_letters = "".join(random.choices(string.ascii_uppercase, k=5))
+    pan_numbers = "".join(random.choices(string.digits, k=4))
+    entity_indicator = random.choice(string.ascii_uppercase)
+    entity_number = random.choice(string.digits[1:])
+    check_digit = random.choice(string.ascii_uppercase + string.digits)
     return f"20{pan_letters}{pan_numbers}{entity_indicator}{entity_number}Z{check_digit}"
 
 
 def generate_dates(num_records: int) -> list[datetime]:
     """Generates dates uniformly within Q1 and Q2 2026 range boundaries."""
-    start_date = pd.to_datetime("2026-01-01T00:00:00Z")
-    end_date = pd.to_datetime("2026-06-30T23:59:59Z")
-    start_ts = int(start_date.timestamp())
-    end_ts = int(end_date.timestamp())
-    random_ts = np.random.randint(start_ts, end_ts, size=num_records)
-    return [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in random_ts]
+    # ponytail: replaced pandas DataFrame / datetime instantiations and numpy random with native datetime and random (DEBT-004)
+    start_ts = int(datetime(2026, 1, 1, tzinfo=timezone.utc).timestamp())
+    end_ts = int(datetime(2026, 6, 30, 23, 59, 59, tzinfo=timezone.utc).timestamp())
+    return [datetime.fromtimestamp(random.randint(start_ts, end_ts), tz=timezone.utc) for _ in range(num_records)]
 
 
 async def init_db():
@@ -115,7 +114,7 @@ async def main():
                 industry_attributes={
                     "gstin": generate_jharkhand_gstin(),
                     "bank_verified": True,
-                    "vehicle_year": int(np.random.randint(2020, 2027))
+                    "vehicle_year": random.randint(2020, 2026)
                 },
                 dynamic_manifest={"verification_status": "COMPLIANT"},
                 created_at=dates_pool[date_idx]
@@ -136,7 +135,7 @@ async def main():
                 industry_attributes={
                     "gstin": generate_jharkhand_gstin(),
                     "bank_verified": True,
-                    "vehicle_year": int(np.random.randint(2015, 2020)) # < 2020
+                    "vehicle_year": random.randint(2015, 2019) # < 2020
                 },
                 dynamic_manifest={"verification_status": "DISQUALIFIED_VEHICLE"},
                 created_at=dates_pool[date_idx]
@@ -152,7 +151,7 @@ async def main():
                 industry_attributes={
                     "gstin": generate_jharkhand_gstin(),
                     "bank_verified": False, # bank_unverified
-                    "vehicle_year": int(np.random.randint(2020, 2027))
+                    "vehicle_year": random.randint(2020, 2026)
                 },
                 dynamic_manifest={"verification_status": "DISQUALIFIED_BANK"},
                 created_at=dates_pool[date_idx]
@@ -167,14 +166,14 @@ async def main():
         # Seed 50 anomalous Maverick Spend records
         # Purchase agreements lacking verified nodal approvals
         for i in range(1, 51):
-            source = np.random.choice(compliant_sellers)
+            source = random.choice(compliant_sellers)
             flow = Flow(
                 tenant_id=tenant_id,
                 name=f"Maverick Purchase Agreement {i:02d}",
                 source_node_id=source.id,
                 target_node_id=buyer_node.id,
                 industry_attributes={
-                    "amount": float(np.random.choice([15000, 32000, 75000, 120000])),
+                    "amount": float(random.choice([15000, 32000, 75000, 120000])),
                     "nodal_approved": False # lacks verified approval
                 },
                 dynamic_manifest={
@@ -196,7 +195,7 @@ async def main():
                 source_node_id=source.id,
                 target_node_id=buyer_node.id,
                 industry_attributes={
-                    "bid_amount": float(np.random.choice([85000, 92000, 105000])),
+                    "bid_amount": float(random.choice([85000, 92000, 105000])),
                     "vehicle_year": source.industry_attributes["vehicle_year"]
                 },
                 dynamic_manifest={
@@ -217,7 +216,7 @@ async def main():
                 source_node_id=source.id,
                 target_node_id=buyer_node.id,
                 industry_attributes={
-                    "bid_amount": float(np.random.choice([88000, 95000, 110000])),
+                    "bid_amount": float(random.choice([88000, 95000, 110000])),
                     "bank_verified": source.industry_attributes["bank_verified"]
                 },
                 dynamic_manifest={
@@ -238,7 +237,7 @@ async def main():
                 source_node_id=source.id,
                 target_node_id=buyer_node.id,
                 industry_attributes={
-                    "bid_amount": float(np.random.randint(50000, 250000)),
+                    "bid_amount": float(random.randint(50000, 249999)),
                     "vehicle_year": source.industry_attributes["vehicle_year"],
                     "bank_verified": source.industry_attributes["bank_verified"]
                 },

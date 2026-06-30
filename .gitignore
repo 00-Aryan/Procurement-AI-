@@ -13,3 +13,15 @@ __pycache__/
 .python-version
 
 .venv
+frontend_image
+sample_test
+
+node_modules
+
+AGENTS.md
+ARCHITECTURE.md
+
+server.log
+
+validation_logs
+core/.env

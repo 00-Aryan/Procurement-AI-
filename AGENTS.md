@@ -20,6 +20,7 @@ To understand your specific technical boundaries, execution scripts, and drift p
 - **Code Optimization Quality (Ponytail):** Read `.antigravity/skills/ponytail.md`
 - **Multi-Agent Graph Orchestration:** Read `.antigravity/skills/state_machine_agent_routing.md`
 - - **Active Task Backlog & Technical Debt Ledger:** Read `.antigravity/backlog_and_debt.md`
+- **Error Isolation & Logging Quality:** Read `.antigravity/skills/error_handling_and_logging.md`
 
 > MANDATORY BOUNDARY RULE: Before starting a terminal change, match your assignment target against the 'Active Milestone' checklist inside `.antigravity/backlog_and_debt.md`. If a task is marked as COMPLETED, do not re-engineer it. If your code introduces a structural shortcut, you must append an tracking log to the 'Active Technical Debt Log' section.
 
@@ -29,3 +30,10 @@ If your current task falls under a specific engineering domain, you must strictl
 - **Data Engineering & Backend:** `.antigravity/skills/role_core_engineering.md`
 - **Data Science & MLOps:** `.antigravity/skills/role_data_and_mlops.md`
 - **Frontend & UI Interactions:** `.antigravity/skills/role_interface_and_ux.md`
+
+### 🧠 Mandatory Agent Memory Synchronization Invariant
+- **Rule:** Before concluding ANY execution turn, terminal code mutation, or package installation, you MUST update and patch the centralized memory index at `.antigravity/agent_memory_harness.json`.
+- **Execution Invariant:** 1. Increment the historical state check values.
+  2. Log the exact timestamp, active milestone phase, and any new code files created or modified.
+  3. Append any technical debt, structural shortcuts, or newly imported packages introduced during the turn.
+- **Boundary:** Saving code changes without immediately synchronizing this JSON state ledger is an absolute pipeline failure. If a task is blocked or hits a compiler error, log the failure state into the harness file before terminating the terminal session.

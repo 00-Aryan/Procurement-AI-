@@ -5,6 +5,7 @@ import {
   FileText,
   Home,
   Lightbulb,
+  Info,
   PackageCheck,
   Rocket,
   Search,
@@ -41,12 +42,13 @@ export const tenantProfile = industryConfig.tenant_profile;
 
 export const navItems: NavItem[] = [
   { label: "Home", href: "/", icon: Home },
-  { label: "Demand Forecast", href: "/forecast", icon: TrendingUp, comingSoon: true },
+  { label: "Demand Forecast", href: "/demand", icon: TrendingUp, comingSoon: true },
   { label: "Inventory Intelligence", href: "/inventory", icon: Boxes },
-  { label: "Supplier Intelligence", href: "/suppliers", icon: UsersRound, comingSoon: true },
+  { label: "Supplier Intelligence", href: "/supplier", icon: UsersRound, comingSoon: true },
   { label: "Risk & Anomalies", href: "/anomalies", icon: ShieldAlert },
   { label: "Recommendations", href: "/recommendations", icon: Lightbulb },
   { label: "Reports", href: "/reports", icon: FileText },
+  { label: "About", href: "/about", icon: Info },
   { label: "AI Copilot", href: "/copilot", icon: Bot }
 ];
 
@@ -62,7 +64,7 @@ export const insightCards: InsightCard[] = [
   {
     title: "Demand Forecast",
     description: `Predict future ${flowType.domain_plural.toLowerCase()} and plan purchases with confidence.`,
-    href: "/forecast",
+    href: "/demand",
     icon: TrendingUp,
     comingSoon: true
   },
@@ -75,7 +77,7 @@ export const insightCards: InsightCard[] = [
   {
     title: "Supplier Intelligence",
     description: `Evaluate ${sellerNode?.domain_plural.toLowerCase() ?? "supplier"} performance and reliability.`,
-    href: "/suppliers",
+    href: "/supplier",
     icon: UsersRound,
     comingSoon: true
   },

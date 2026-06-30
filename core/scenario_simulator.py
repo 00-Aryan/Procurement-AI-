@@ -162,13 +162,69 @@ class ProcurementScenarioSimulator:
         except ValidationError as exc:
             raise ScenarioSimulationError(f"Invalid or missing baseline reorder parameters: {exc}") from exc
 
+    def _normalize_stress_factor_aliases(self, perturbation_matrix: dict[str, Any]) -> dict[str, Any]:
+        """Normalize public API stress factor aliases to internal canonical field names.
+        
+        Mappings:
+        - demand_shock -> demand_multiplier = 1.0 + demand_shock
+        - lead_time_delay -> lead_time_delay_days
+        - inflation_surcharge -> inflation_rate
+        
+        Also removes scenario_name if present.
+        Raises ScenarioSimulationError on conflicting values.
+        """
+        if not isinstance(perturbation_matrix, dict):
+            return {}
+        
+        # Create a copy to avoid mutating the original
+        normalized = dict(perturbation_matrix)
+        
+        # Remove scenario_name if present - it's not a stress factor
+        normalized.pop("scenario_name", None)
+        
+        # Alias to canonical field mappings with transforms
+        alias_mappings = {
+            "demand_shock": ("demand_multiplier", lambda v: 1.0 + float(v)),
+            "lead_time_delay": ("lead_time_delay_days", lambda v: int(v)),
+            "inflation_surcharge": ("inflation_rate", lambda v: float(v)),
+        }
+        
+        for alias, (canonical, transform) in alias_mappings.items():
+            if alias in normalized:
+                alias_value = normalized[alias]
+                if alias_value is None:
+                    continue
+                
+                transformed_value = transform(alias_value)
+                
+                if canonical in normalized:
+                    # Canonical field also provided - check for conflict
+                    canonical_value = normalized[canonical]
+                    if canonical_value is not None and abs(float(canonical_value) - float(transformed_value)) > 1e-9:
+                        raise ScenarioSimulationError(
+                            f"Conflicting stress factor values for {alias} and {canonical}."
+                        )
+                    # If equivalent, keep the canonical (don't override)
+                else:
+                    # Set the canonical field
+                    normalized[canonical] = transformed_value
+                
+                # Remove the alias so it doesn't get passed to StressFactors
+                del normalized[alias]
+        
+        return normalized
+
     def _parse_stress_factors(self, perturbation_matrix: dict[str, Any]) -> StressFactors:
         if perturbation_matrix is None:
             perturbation_matrix = {}
         if not isinstance(perturbation_matrix, dict):
             raise ScenarioSimulationError("perturbation_matrix must be a dictionary.")
+        
+        # Normalize aliases before constructing StressFactors
+        normalized_matrix = self._normalize_stress_factor_aliases(perturbation_matrix)
+        
         try:
-            return StressFactors(**perturbation_matrix)
+            return StressFactors(**normalized_matrix)
         except ValidationError as exc:
             raise ScenarioSimulationError(f"Invalid stress perturbation matrix: {exc}") from exc
 

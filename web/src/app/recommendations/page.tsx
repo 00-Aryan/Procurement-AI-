@@ -1,12 +1,50 @@
 import { Lightbulb, Sparkles } from "lucide-react";
 
-const recommendations = [
+import { GovernanceBoundaryAlert } from "@/components/GovernanceBoundaryAlert";
+import { GatewayGovernanceError, throwGatewayGovernanceError } from "@/lib/gatewayErrors";
+import type { GatewayGovernanceBoundary } from "@/lib/gatewayErrors";
+
+export const dynamic = "force-dynamic";
+
+const DEFAULT_TENANT_ID = "f7a2b4c9-3d1e-4f8a-b5c2-9e0d1a2b3c4d";
+
+type Recommendation = [title: string, detail: string, impact: string, savings: string];
+
+type RecommendationsFetchResult = {
+  recommendations: Recommendation[];
+  governanceBoundary: GatewayGovernanceBoundary | null;
+};
+
+const FALLBACK_RECOMMENDATIONS: Recommendation[] = [
   ["Reorder Coffee Beans", "Current stock will last only 5 days. Reorder 100 kg to avoid stockout.", "High", "₹ 1.2 Cr"],
   ["Switch Supplier for Sugar Syrup", "New supplier offers 8% lower price with similar quality.", "Medium", "₹ 48 Lakhs"],
   ["Reduce Excess Inventory", "18 items are overstocked. Consider reducing order quantities.", "Medium", "₹ 35 Lakhs"]
 ];
 
-export default function RecommendationsPage() {
+async function fetchRecommendations(): Promise<RecommendationsFetchResult> {
+  try {
+    const res = await fetch("http://127.0.0.1:8000/api/v1/procurement/recommendations", {
+      headers: {
+        "X-Tenant-ID": DEFAULT_TENANT_ID,
+      },
+      next: { revalidate: 0 }
+    });
+    if (!res.ok) {
+      await throwGatewayGovernanceError(res);
+    }
+    return { recommendations: await res.json() as Recommendation[], governanceBoundary: null };
+  } catch (error) {
+    if (error instanceof GatewayGovernanceError) {
+      return { recommendations: FALLBACK_RECOMMENDATIONS, governanceBoundary: error.boundary };
+    }
+
+    return { recommendations: FALLBACK_RECOMMENDATIONS, governanceBoundary: null };
+  }
+}
+
+export default async function RecommendationsPage() {
+  const { recommendations, governanceBoundary } = await fetchRecommendations();
+
   return (
     <div className="min-h-screen px-12 py-10">
       <header className="flex items-center justify-between">
@@ -19,6 +57,10 @@ export default function RecommendationsPage() {
           AI prioritized
         </div>
       </header>
+
+      {governanceBoundary ? (
+        <GovernanceBoundaryAlert boundary={governanceBoundary} surface="Recommendations" />
+      ) : null}
 
       <section className="mt-8 space-y-4">
         {recommendations.map(([title, detail, impact, savings]) => (

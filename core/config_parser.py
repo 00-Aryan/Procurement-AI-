@@ -1,8 +1,51 @@
 import os
 import json
 import re
+import logging
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger("procurement_engine")
+
+
+class ProcurementException(Exception):
+    """Central base exception for all typed platform exceptions."""
+    def __init__(self, error_code: str, tenant_id: str, scope: str, trace_context: str):
+        self.error_code = error_code
+        self.tenant_id = tenant_id
+        self.scope = scope
+        self.trace_context = trace_context
+        self.message = f"[{error_code}] Tenant: {tenant_id} | Scope: {scope} | Trace Context: {trace_context}"
+        super().__init__(self.message)
+
+
+class ConfigParserException(ProcurementException):
+    """Exception raised during configuration parser issues."""
+    pass
+
+
+class AnomalyEngineException(ProcurementException):
+    """Exception raised during anomaly engine processing."""
+    pass
+
+
+class ReorderOptimizerException(ProcurementException):
+    """Exception raised during reorder optimization."""
+    pass
+
+
+class DatabaseLayerException(ProcurementException):
+    """Exception raised during database connection/transaction faults."""
+    pass
+
+
+def log_and_raise(exc_cls, error_code: str, tenant_id: str, scope: str, trace_context: str, original_exc: Optional[Exception] = None):
+    msg = f"[{error_code}] Tenant: {tenant_id} | Scope: {scope} | Trace Context: {trace_context}"
+    logger.error(msg)
+    if original_exc:
+        raise exc_cls(error_code, tenant_id, scope, trace_context) from original_exc
+    raise exc_cls(error_code, tenant_id, scope, trace_context)
+
 
 
 class ValidationRules(BaseModel):
@@ -80,22 +123,58 @@ def load_config(config_path: str = "industry-config.json") -> IndustryConfig:
         # Ensure directories exist
         dirname = os.path.dirname(config_path)
         if dirname:
-            os.makedirs(dirname, exist_ok=True)
+            try:
+                os.makedirs(dirname, exist_ok=True)
+            except Exception as e:
+                # Fall back to logging standard format
+                logger.warning(f"[WRN_DIR_CREATION_FAILURE] Tenant: SYSTEM_GLOBAL | Scope: load_config_makedirs | Trace Context: {e}")
             
-        with open(config_path, "w") as f:
-            json.dump(default_config, f, indent=2)
+        try:
+            with open(config_path, "w") as f:
+                json.dump(default_config, f, indent=2)
+        except Exception as e:
+            logger.warning(f"[WRN_FILE_WRITE_FAILURE] Tenant: SYSTEM_GLOBAL | Scope: load_config_write | Trace Context: {e}")
+            
         return IndustryConfig(**default_config)
 
-    with open(config_path, "r") as f:
-        data = json.load(f)
+    try:
+        with open(config_path, "r") as f:
+            data = json.load(f)
+    except FileNotFoundError as e:
+        log_and_raise(
+            ConfigParserException,
+            "ERR_CONFIG_FILE_MISSING",
+            "SYSTEM_GLOBAL",
+            "load_config",
+            f"Configuration file not found at {config_path}",
+            e
+        )
+    except json.JSONDecodeError as e:
+        log_and_raise(
+            ConfigParserException,
+            "ERR_CONFIG_PARSE_FAILURE",
+            "SYSTEM_GLOBAL",
+            "load_config",
+            f"Invalid JSON format in {config_path}: {str(e)}",
+            e
+        )
+    except Exception as e:
+        log_and_raise(
+            ConfigParserException,
+            "ERR_CONFIG_LOAD_FAILURE",
+            "SYSTEM_GLOBAL",
+            "load_config",
+            f"Unexpected config read error: {str(e)}",
+            e
+        )
         
     # ponytail: dynamically map complex json keys to expected IndustryConfig schema fields
     if "val" not in data:
         gstin_pat = r"^20[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
         try:
             gstin_pat = data["entity_mapping"]["attribute_registry"]["gstin"]["constraints"]["pattern"]
-        except KeyError:
-            pass
+        except KeyError as e:
+            logger.info(f"[INF_CONFIG_MAPPING_MISSING] Tenant: SYSTEM_GLOBAL | Scope: load_config_gstin | Trace Context: Using default GSTIN pattern. Details: {e}")
         
         min_days = 7
         try:
@@ -105,8 +184,8 @@ def load_config(config_path: str = "industry-config.json") -> IndustryConfig:
                     match = re.search(r"\d+", expr)
                     if match:
                         min_days = int(match.group())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[WRN_CONFIG_MAPPING_FAILURE] Tenant: SYSTEM_GLOBAL | Scope: load_config_bid_window | Trace Context: Failed parsing bid window rules: {e}")
 
         data["val"] = {
             "minimum_bid_window_days": min_days,
@@ -119,8 +198,8 @@ def load_config(config_path: str = "industry-config.json") -> IndustryConfig:
         try:
             gates = data.get("risk_engine", {}).get("disqualification_gates", [])
             req_bank = any(g.get("gate_id") == "gate.bank_unverified" for g in gates)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[WRN_CONFIG_MAPPING_FAILURE] Tenant: SYSTEM_GLOBAL | Scope: load_config_gate | Trace Context: Failed parsing disqualification gates: {e}")
         
         data["gate"] = {
             "min_vehicle_year": min_yr,
