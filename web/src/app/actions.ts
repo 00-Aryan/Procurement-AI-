@@ -1,7 +1,8 @@
 "use server";
 
+import { BACKEND_URL } from "@/lib/api";
+
 const DEFAULT_TENANT_ID = "f7a2b4c9-3d1e-4f8a-b5c2-9e0d1a2b3c4d";
-const BACKEND_URL = "http://127.0.0.1:8000";
 
 export async function executeScenarioSimulation(matrix: Record<string, any>) {
   const res = await fetch(`${BACKEND_URL}/api/v1/procurement/simulate`, {

@@ -2,6 +2,7 @@ import { AlertTriangle, ShieldCheck } from "lucide-react";
 
 import { GovernanceBoundaryAlert } from "@/components/GovernanceBoundaryAlert";
 import { tenantProfile } from "@/lib/dashboard";
+import { BACKEND_URL } from "@/lib/api";
 import { GatewayGovernanceError, throwGatewayGovernanceError } from "@/lib/gatewayErrors";
 import type { GatewayGovernanceBoundary } from "@/lib/gatewayErrors";
 
@@ -30,7 +31,7 @@ const FALLBACK_ANOMALIES_DATA: AnomaliesData = {
 
 async function fetchAnomaliesData(): Promise<AnomaliesFetchResult> {
   try {
-    const res = await fetch("http://127.0.0.1:8000/api/v1/procurement/anomalies", {
+    const res = await fetch(`${BACKEND_URL}/api/v1/procurement/anomalies`, {
       headers: {
         "X-Tenant-ID": DEFAULT_TENANT_ID,
       },

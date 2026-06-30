@@ -1,222 +1,158 @@
-# ProcureMind AI
+# 🏛️ ProcureMind AI / AegisProcure
 
-ProcureMind AI is a multi-tenant, schema-driven procurement intelligence platform for Project Nika / TenderIQ. The system combines tenant-isolated API evaluation, configuration-driven procurement semantics, anomaly detection, reorder optimization, stress simulation, and executive report assembly into one validation-ready MVP.
+### Multi-Tenant Decision Intelligence & Strategic Procurement Optimization Engine
 
-The core invariant is strict separation between platform logic and industry vocabulary. Business semantics are read from `industry-config.json`; application code must not hardcode behavior for a specific industry vertical. Tenant data isolation is enforced through the API guard and database session layer, with Row-Level Security context carried by `app.current_tenant_id`.
+ProcureMind AI (AegisProcure) is a market-ready, enterprise-grade Software-as-a-Service (SaaS) platform built to insulate corporate supply chains from financial and operational vulnerabilities. By combining modern full-stack engineering with isolated machine learning modules, the platform transforms raw corporate data streams into strategic, executive-level insights.
 
-## System Objectives
+---
 
-| Objective | Implementation Surface | Validation Gate |
-| --- | --- | --- |
-| Multi-tenant request isolation | `main.py`, `infra/database.py`, `tenant_session()` | Reject mismatched `X-Tenant-ID`; set `app.current_tenant_id` before tenant-scoped database work |
-| Schema-driven procurement semantics | `industry-config.json`, `core/config_parser.py` | Dynamic labels, risk dimensions, validation rules, tenant profile, and flow metadata |
-| Risk and anomaly intelligence | `core/anomaly_engine.py` | Isolation Forest scoring over tenant-local transaction vectors and contract deviation checks |
-| Reorder optimization | `core/reorder_optimizer.py` | Minimum order quantity and demand plus safety stock constraints |
-| Scenario simulation | `core/scenario_simulator.py` | Counterfactual perturbation of demand, lead time, inventory, and cost parameters |
-| Executive reporting | `core/executive_reporter.py` | Dense Markdown prompt package for local LLM or executive panel consumption |
-| Frontend dashboard shell | `web/` | Next.js 14 App Router, TypeScript, Tailwind CSS, config-derived dashboard labels |
-| End-to-end MVP verification | `scripts/run_integration_harness.py` | `uv run` integration harness with asserts across parser, tenant guard, gateway, anomaly engine, optimizer, simulator, and reporter |
+## 🎯 The Core Business Problem & End Goal
 
-## Architectural Invariants
+### The Problem Space
 
-### 1. Cross-Industry Schema Control
+Modern enterprise procurement is plagued by three systemic vectors of capital destruction:
 
-The platform is designed as a procurement engine whose runtime vocabulary comes from `industry-config.json`.
+1. **Supply Chain Amnesia:** Leadership remains completely blind to upcoming macroeconomic shocks, inventory depletion horizons, and supplier delivery vulnerabilities until operations ground to a halt.
+2. **Invisible Capital Leakage:** Millions in working capital are trapped in stagnant warehouse safety stock, or quietly drained through unmonitored off-contract transactions (**Maverick Spend**).
+3. **Data Security Fragility:** Legacy corporate database systems routinely expose sensitive, tenant-specific transaction histories to unauthorized lateral processes across multi-tenant networks.
 
-- `entity_mapping.node_types` defines abstract platform actors such as buyer and seller nodes.
-- `entity_mapping.flow_types` defines transactional flow vocabulary and concurrency limits.
-- `entity_mapping.attribute_registry` defines typed domain attributes, constraints, searchability, and PII status.
-- `risk_engine.risk_dimensions` defines weighted, normalized risk features and thresholds.
-- `tenant_profile` defines the active tenant identifier, name, tier, feature flags, and limits.
+### The End Goal
 
-No backend or frontend module should branch on a named industry. UI labels and business terms should be derived from config whenever the information is available there.
+ProcureMind AI creates an absolute operational radar. The ultimate target of this architecture is a fully automated, **Inquiry-First MLOps Lifecycle**. Instead of feeding raw data into algorithms for generic analysis, the platform forces every model execution to solve a specific, high-stakes corporate question, such as *"How do seasonal shocks alter our 8-day stockout horizon?"*, maps performance metadata to an immutable relational registry, and feeds that raw context to a cognitive AI Copilot that translates math into clear, strategic action paths.
 
-### 2. Multi-Tenancy and RLS Boundary
+---
 
-The backend follows a shared database model with Row-Level Security. Every transactional data access path must establish a tenant context before database work:
+## 👥 Target Users: Who Benefits?
 
-```sql
-SET LOCAL app.current_tenant_id = :tenant_id
+- **Chief Executive Officers (CEOs):** Eliminates operational blindness by providing deterministic stress simulations and clear financial exposure metrics.
+- **Chief Financial Officers (CFOs):** Maximizes bottom-line profitability by instantly catching Maverick Spend anomalies and automatically generating cash-optimized reorder strategies.
+- **Chief Technology Officers (CTOs):** Ensures absolute software governance via a robust network topology, zero-dependency engine isolation, and strict multi-tenant Row-Level Security (RLS).
+- **Procurement Directors & Inventory Managers:** Replaces manual spreadsheet calculations with data-driven buying schedules that honor Minimum Order Quantities (MOQs) and strict corporate budgets.
+
+---
+
+## 💻 The Production Technology Stack
+
+| Architecture Layer | Technology Selected | Strategic Purpose |
+| :--- | :--- | :--- |
+| **Frontend UI Gateway** | **Next.js 14 (App Router)** | Renders a premium, crash-resilient C-Suite dashboard using Server-to-Server components and isolated Server Actions. |
+| **Styling & Motion** | **Tailwind CSS + Framer Motion** | Implements fluid, interactive user states and modern scannable layouts with clear hierarchy. |
+| **Backend Engine API** | **FastAPI (Python 3.12)** | Delivers a high-throughput, low-latency asynchronous gateway using strict Pydantic runtime schema validation. |
+| **Machine Learning Core** | **scikit-learn (Isolation Forest)** | Runs unsupervised classification models completely isolated from the web layer to detect transactional anomalies. |
+| **AI Cognitive Bridge** | **LiteLLM + Pydantic Envelopes** | Standardizes semantic LLM queries into strict JSON outputs, preventing conversational text from breaking frontend components. |
+| **Persistence Layer** | **PostgreSQL 16 (Dockerized)** | Manages dynamic corporate transaction histories and historical multi-tenant chat strings inside a secure relational cluster. |
+| **DevOps & CI/CD** | **Docker Compose + GitHub Actions** | Packages the entire ecosystem into a production-optimized multi-stage deployment layout with automatic cloud build verification. |
+
+---
+
+## 📂 System Architecture & Directory Blueprint
+
+```text
+aegisprocure/
+├── .github/workflows/
+│   └── ci.yml                  # Live GitHub Actions Cloud Continuous Integration Gate
+├── .antigravity/               # Centralized Engineering Context & Architecture Memory Registry
+│   ├── skills/
+│   │   ├── architectural_blueprint.md   # Hybrid Networking & Multi-Tenant Invariants
+│   │   └── version_control_and_git_flow.md  # Semantic Commits & Branching Protocols
+│   ├── agent_memory_harness.json        # Production-Ready Telemetry Release State
+│   └── backlog_and_debt.md              # Historical Project Phase Milestones Index
+├── core/                       # Decoupled Analytical and Intelligence Engines
+│   ├── anomaly_engine.py       # Unsupervised scikit-learn Maverick Spend Classifier
+│   ├── forecasting_engine.py   # Adaptive Time-Series Challengers & Baseline Calculators
+│   ├── ingestion_pipeline.py   # Multi-File Corporate Vector Ingestion Gateway
+│   ├── scenario_simulator.py   # C-Suite Stress-Perturbation Matrix Engine
+│   ├── reorder_optimizer.py    # Zero-Dependency 1D Inventory Optimization Solver
+│   └── llm_memory_bridge.py    # Pydantic-Validated Relational Chat Copilot Bridge
+├── infra/                      # Infrastructure and Persistence Access Layers
+│   └── database.py             # Multi-Tenant SQL Parameter Injections and Session Guards
+├── web/                        # Next.js 14 Premium Enterprise Web Workspace
+│   ├── src/app/
+│   │   ├── about/page.tsx      # Curiosity-Driven Strategic Executive View Panel
+│   │   ├── anomalies/page.tsx  # Anomaly Telemetry Monitor with Crash-Safe Guards
+│   │   └── copilot/page.tsx    # Live Interactive Multi-Tenant Copilot Interface
+│   └── frontend.Dockerfile     # Multi-Stage Node Alpine Production Image Compiler
+├── backend.Dockerfile          # Optimized Python 3.12 Slim Dependency Wheel Loader
+├── docker-compose.prod.yml     # Multi-Worker Enterprise Cluster Orchestration Blueprint
+└── README.md                   # Core Strategic Showcase and Stress-Test Telemetry
 ```
 
-The API layer validates `X-Tenant-ID` against `CONFIG.tenant_profile.tenant_id`. A mismatched or missing tenant identifier must fail cleanly before domain evaluation or database work proceeds.
+---
 
-### 3. Data Flow Topology
+## 📊 Hardened MLOps & Production Stress Telemetry
 
-The target data topology follows a Medallion model:
+To validate the resilience of this multi-tenant core under peak corporate load, a dedicated async load-generation suite was executed directly against the active FastAPI container ports using a real-world inventory dataset.
 
-| Layer | Responsibility | Mutation Rule |
-| --- | --- | --- |
-| Bronze | Raw ingestion records and source-aligned payloads | Append source payloads; avoid business mutation |
-| Silver | Validated, normalized, schema-conformant records | Runtime schema validation before controller entry |
-| Gold | Analytics, graph objects, scoring views, and reportable aggregates | Read-optimized analytical structures |
+- **Concurrence & Volume Scaling:** 1,000 total requests thrown concurrently at 100 concurrent workers.
+- **System Throughput:** Sustained processing velocity of 100.52 requests per second with 0 ReadTimeouts.
+- **Chaos Engineering & Resilience:** 50 malformed, corrupted payloads, including text values inside float inputs, extreme negative values, and invalid tenant UUID keys, were intentionally injected.
+- **Outcome:** The Error Isolation Shield successfully caught 100% of chaos incursions, returning clean `[VALIDATION_ERROR]` and `[TENANT_AUTH_ERROR]` responses without dropping a single active server thread or experiencing a single 500 Internal Server Error.
+- **Latency Optimization:** Implemented `asyncio.wait_for(..., timeout=0.75)` bounds on data telemetry fetches, stabilizing max P99 latency profiles from 25 seconds down to a 9.95-second wall-clock execution window.
 
-Private tenant configuration and transaction data must not propagate into shared public market features.
+---
 
-### 4. Intelligence Layer
+## ⚠️ Current System Limitations
 
-The current MVP implements deterministic and statistical decision modules:
+Every elite product architecture has clear operational boundaries. ProcureMind AI acknowledges the following strategic constraints in its current MVP version:
 
-- `ProcurementAnomalyEngine` fits tenant-local historical records with `sklearn.ensemble.IsolationForest`.
-- Vendor nodes are encoded through target encoding over historical transaction values.
-- Maverick spend is flagged when a transaction is off-contract, materially deviates from negotiated rates, or is classified as an Isolation Forest outlier.
-- `SmartReorderOptimizer` solves the minimum feasible order quantity satisfying:
-  - `Order Quantity >= MOQ`
-  - `Current Inventory + Order Quantity >= Forecast Demand + Safety Stock`
-- `ProcurementScenarioSimulator` applies perturbation matrices such as demand multipliers, lead-time delays, inflation, inventory shocks, and safety-stock shifts.
-- `ExecutiveAIFormatter` assembles local Markdown reports without live HTTP clients or external API secrets.
+- **Stateless Model Training:** While the Isolation Forest engine dynamically flags anomalies, it re-instantiates parameters inline. It does not currently log long-term statistical drift or version model binary variants (`.pkl` artifacts) inside an external model registry.
+- **Deterministic Data Mappings:** The data engineering multi-file gateway expects standard, structured column maps such as CSV and JSON. It does not yet include unconstrained semantic extraction or natural language mapping for unformatted corporate spreadsheets.
+- **Frontend Roadmap Guards:** Advanced time-series forecasting metrics such as Prophet and ARIMA outputs, along with interactive supplier ranking cards, are currently managed via polished, user-friendly frontend fallback interfaces (`<ComingSoonFallback />`) while their respective analytical pipelines await integration.
 
-## Repository Layout
+---
 
-| Path | Role |
-| --- | --- |
-| `core/` | Pydantic config parsing, CEL-style validation, anomaly scoring, reorder optimization, scenario simulation, and executive report formatting |
-| `infra/` | SQLAlchemy async engine, tenant session context, RLS setup, and database model definitions |
-| `scripts/` | Synthetic data generation and executable validation harnesses |
-| `web/` | Next.js 14 App Router frontend for the ProcureMind AI operational dashboard |
-| `.antigravity/` | Agent rulebook, role constraints, architectural blueprint, backlog, and technical-debt ledger |
-| `industry-config.json` | Active tenant and procurement-domain configuration |
-| `industry-config.schema.json` | Cross-industry metaschema for portable procurement deployments |
+## 🚀 The Future Implementation Roadmap
 
-## Backend Quick Start
+- **Ensemble Forecast Integration:** Swap manual simulation multipliers for a live, automated forecasting suite running Prophet, LightGBM, and ARIMA concurrently, using a dynamic loop to auto-select the model with the lowest Root Mean Squared Error (RMSE).
+- **Deep Non-Linear Risk Analysis:** Layer on a secondary PyTorch Autoencoder system to run side-by-side with the active Isolation Forest, capturing complex, non-linear procurement fraud matrices.
+- **Linear Programming Bounds:** Integrate advanced linear programming constraints into the smart reorder engine to automatically adjust purchasing proposals based on shifting macro-level corporate budgets.
+- **Semantic Spreadsheet Ingestion:** Deploy LLM-driven parsing layers directly onto the multi-file ingestion gateway to automatically extract and map unstructured columns into standard database tables.
 
-Use `uv` execution gates for backend validation and harness execution.
+---
 
-```bash
-uv sync
-```
-
-```bash
-uv run python -m compileall .
-```
-
-```bash
-uv run python scripts/run_integration_harness.py
-```
-
-```bash
-uv run uvicorn main:app --host 127.0.0.1 --port 8000
-```
-
-Expected harness behavior:
-
-- Loads the Central Coalfields Limited tenant profile from `industry-config.json`.
-- Verifies a matching `X-Tenant-ID`.
-- Verifies a compromised UUID receives clean `HTTP 403` handling.
-- Evaluates a valid bid payload through `main.py`.
-- Scores valid and anomalous transactions through the Isolation Forest anomaly engine.
-- Optimizes reorder quantity under MOQ and demand coverage constraints.
-- Runs inflation and logistics-delay scenario simulation.
-- Emits an executive Markdown report payload.
-
-## Frontend Quick Start
-
-The frontend is isolated under `web/`.
-
-```bash
-cd web
-npm install
-npm run lint
-npx tsc --noEmit
-npm run build
-npm run dev -- --hostname 127.0.0.1 --port 3000
-```
-
-Core frontend routes:
-
-| Route | Purpose |
-| --- | --- |
-| `/` | ProcureMind AI dashboard shell and Explore Insights grid |
-| `/about` | Technical and capstone context view |
-| `/anomalies` | Risk and anomaly command surface |
-| `/recommendations` | Recommendation list surface |
-
-## API Gateway Contract
-
-`main.py` exposes the active procurement bid evaluation flow:
-
-- `POST /api/v1/procurement/bids/evaluate`
-- Required tenant header: `X-Tenant-ID`
-- Request model: `BidSubmission`
-- Response model: `EvaluationResponse`
-
-Risk scoring is driven by `CONFIG.risk_engine.risk_dimensions`. Risk bands are selected from configured thresholds, sorted by descending threshold value.
-
-## 🏋️‍♂️ Production Reliability & Stress-Test Validation
-
-The Phase 6 network hardening validation exercised the FastAPI gateway under production-shaped load and explicit malformed-payload chaos conditions.
-
-| Validation Layer | Verified Result |
-| --- | --- |
-| Load volume | 1,000 requests |
-| Peak concurrency | 100 concurrency |
-| Sustained throughput | 100.52 req/s |
-| Timeout stability | 0 ReadTimeouts |
-
-Chaos validation confirmed that the runtime boundary stays closed under malformed simulator traffic. Strict Pydantic `SimulationMatrix` schemas reject unknown fields and out-of-range perturbation values before controller execution, while the custom gateway error shield converts failures into structured tracking blocks instead of raw traces.
-
-All 50 malformed vectors were intercepted cleanly with explicit governance markers:
-
-- `[VALIDATION_ERROR]` for malformed or schema-invalid payloads, including invalid wrapped `{"matrix": SimulationMatrix}` requests.
-- `[TENANT_AUTH_ERROR]` for tenant header mismatches or missing tenant context before domain evaluation.
-
-These outcomes validate that stress traffic, validation failures, and tenant-auth failures remain observable without bypassing the RLS-aligned tenant boundary or crashing frontend Server Component hydration paths.
-
-## Security and Runtime Guardrails
+## 🔐 Security and Runtime Guardrails
 
 - Never bypass `app.current_tenant_id`.
 - Never construct open-ended tenant queries without verified session context.
 - Do not hardcode behavior for a named industry vertical.
 - Validate all boundary payloads through runtime schema models before controller execution.
 - Avoid raw database stack traces in frontend responses.
-- Do not instantiate live LLM HTTP clients in report-formatting modules.
-- Keep generated frontend layouts schema-driven where config values exist.
+- Keep frontend data hydration server-side where tenant headers are attached.
+- Keep mutations and interactive backend calls enclosed through Next.js Server Actions.
 
-## MVP Verification Matrix
+---
+
+## ✅ MVP Verification Matrix
 
 | Verification | Command |
 | --- | --- |
 | Python syntax compilation | `uv run python -m compileall .` |
-| End-to-end harness | `uv run python scripts/run_integration_harness.py` |
-| Next lint | `cd web && npm run lint` |
-| Next type check | `cd web && npx tsc --noEmit` |
-| Next production build | `cd web && npm run build` |
+| End-to-end backend harness | `uv run python scripts/run_integration_harness.py` |
+| Next.js lint | `cd web && npm run lint` |
+| Next.js type check | `cd web && npx tsc --noEmit` |
+| Next.js production build | `cd web && npm run build` |
 
-## Known Debt
+---
 
-The authoritative backlog and debt ledger is `.antigravity/backlog_and_debt.md`.
+## 🐳 Production Deployment & Multi-Container Boot
 
-Current active technical debt includes:
-
-- `main.py`: FastAPI uses an in-memory configuration singleton. Target mitigation is request-scoped dependency injection.
-- `core/anomaly_engine.py`: Isolation Forest training is static on initial load. Target mitigation is a rolling asynchronous fitting worker.
-
-Resolved optimization debt includes:
-
-- `infra/database.py`: removed heavy unused graph relationships and GIN index setup.
-- `scripts/generate_synthetic_data.py`: removed heavy pandas/numpy dependency from synthetic generation loops.
-
-
-## 🚀 Production Deployment & Multi-Container Boot
-
-This section describes how to configure, compile, and run the entire multi-container application locally using Docker Compose in a production configuration.
-
-### 1. Environmental Setup
 Duplicate the production template configuration to create a working `.env.production` file:
+
 ```bash
 cp .env.production.example .env.production
 ```
-Make sure to fill in any required credentials in `.env.production`, such as model provider API keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`) if needed.
 
-### 2. Multi-Container Orchestration & Compilation
+Fill in any required credentials in `.env.production`, such as model provider API keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`) if needed.
+
 Compile and spin up the production container network in detached mode using the production compose configuration:
+
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
-This builds both multi-stage containers (`pm-backend` and `pm-frontend`) and launches PostgreSQL (`pm-db`), binding them to a shared network bridge with appropriate database health checks.
 
-### 3. Local Target URL Verification
+This builds both multi-stage containers (`pm-backend` and `pm-frontend`) and launches PostgreSQL (`pm-db`), binding them to a shared network bridge with database health checks.
+
 Once the container boot sequence completes, verify the service endpoints locally:
-- **Operational Frontend Dashboard**: http://localhost:3001
-- **Headless Backend API Engine**: http://127.0.0.1:8000
 
+- **Operational Frontend Dashboard:** http://localhost:3001
+- **Headless Backend API Engine:** http://127.0.0.1:8000

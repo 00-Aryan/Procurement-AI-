@@ -1,9 +1,15 @@
+import inspect
 import logging
+import os
 import re
+import time
 import uuid
-from typing import Optional, Any
+from collections import defaultdict, deque
+from functools import wraps
+from typing import Optional, Any, Callable
 from fastapi import FastAPI, Depends, Header, HTTPException, status, Request, File, UploadFile
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator , ConfigDict
 from sqlalchemy import select
@@ -26,7 +32,6 @@ class SecurityConfigurationError(ProcurementException):
     """Exception raised for critical security configuration faults."""
     pass
 
-import os
 ENV_MODE = os.getenv("ENV_MODE")
 if ENV_MODE == "production":
     if not os.getenv("DATABASE_URL"):
@@ -66,6 +71,106 @@ app = FastAPI(
     version="1.0.0"
 )
 
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    ALLOWED_CORS_ORIGINS = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    ALLOWED_CORS_ORIGINS = [
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "https://localhost:3001",
+        "https://127.0.0.1:3001",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Tenant-ID"],
+)
+
+
+class RateLimitExceeded(Exception):
+    """Raised when an authenticated caller exceeds an endpoint throttle."""
+
+    def __init__(self, identifier: str, limit_spec: str):
+        self.identifier = identifier
+        self.limit_spec = limit_spec
+        super().__init__(f"Rate limit exhausted for {identifier}: {limit_spec}")
+
+
+class SlidingWindowRateLimiter:
+    """In-process sliding-window limiter for single-node API gateway throttles."""
+
+    def __init__(self) -> None:
+        # ponytail: memory store is per worker; swap to Redis before horizontal production scale.
+        self._events: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = asyncio.Lock()
+
+    def limit(self, limit_spec: str, key_func: Callable[..., str]) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        max_requests, window_seconds = self._parse_limit(limit_spec)
+
+        def decorator(endpoint: Callable[..., Any]) -> Callable[..., Any]:
+            signature = inspect.signature(endpoint)
+
+            @wraps(endpoint)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                identifier = key_func(*args, **kwargs)
+                await self._check(identifier, limit_spec, max_requests, window_seconds)
+                return await endpoint(*args, **kwargs)
+
+            wrapper.__signature__ = signature
+            return wrapper
+
+        return decorator
+
+    async def _check(
+        self,
+        identifier: str,
+        limit_spec: str,
+        max_requests: int,
+        window_seconds: int,
+    ) -> None:
+        now = time.monotonic()
+        window_start = now - window_seconds
+
+        async with self._lock:
+            events = self._events[identifier]
+            while events and events[0] <= window_start:
+                events.popleft()
+
+            if len(events) >= max_requests:
+                raise RateLimitExceeded(identifier, limit_spec)
+
+            events.append(now)
+
+    @staticmethod
+    def _parse_limit(limit_spec: str) -> tuple[int, int]:
+        amount, period = limit_spec.split("/", 1)
+        if period != "minute":
+            raise ValueError(f"Unsupported rate limit period: {period}")
+        return int(amount), 60
+
+
+rate_limiter = SlidingWindowRateLimiter()
+
+
+def tenant_rate_key(*args: Any, **kwargs: Any) -> str:
+    request = kwargs.get("request")
+    path = request.url.path if request else "unknown_endpoint"
+    return f"{path}:tenant:{kwargs.get('tenant_id', 'unknown')}"
+
+
+def session_rate_key(*args: Any, **kwargs: Any) -> str:
+    request = kwargs.get("request")
+    req = kwargs.get("req")
+    path = request.url.path if request else "unknown_endpoint"
+    tenant_id = kwargs.get("tenant_id", "unknown")
+    session_id = getattr(req, "session_id", "unknown")
+    return f"{path}:tenant:{tenant_id}:session:{session_id}"
+
+
 # Global Exception Handlers
 # Global Exception Handlers
 @app.exception_handler(RequestValidationError)
@@ -99,6 +204,30 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "scope": scope,
             "detail": "Validation failed",
             "errors": error_details,
+        },
+    )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded):
+    tenant_id = request.headers.get("X-Tenant-ID", "unknown")
+    scope = f"{request.method} {request.url.path}"
+    message = (
+        f"[RATE_LIMIT_EXHAUSTED] Tenant: {tenant_id} | "
+        f"Scope: {scope} | "
+        f"Trace Context: {exc.identifier} exceeded {exc.limit_spec}"
+    )
+
+    logger.warning(message)
+
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={
+            "error": message,
+            "error_code": "[RATE_LIMIT_EXHAUSTED]",
+            "tenant_id": tenant_id,
+            "scope": scope,
+            "detail": "Rate limit exhausted",
         },
     )
 
@@ -463,7 +592,12 @@ class SimulationRequest(BaseModel):
 
 
 @app.post("/api/v1/procurement/simulate")
-async def simulate_scenario(req: SimulationRequest, tenant_id: str = Depends(verify_tenant_isolation)):
+@rate_limiter.limit("20/minute", tenant_rate_key)
+async def simulate_scenario(
+    request: Request,
+    req: SimulationRequest,
+    tenant_id: str = Depends(verify_tenant_isolation),
+):
     try:
         # MLOps Pipeline Wiring: Log baseline model snapshot matching active X-Tenant-ID
         try:
@@ -495,7 +629,12 @@ class ChatRequest(BaseModel):
 
 
 @app.post("/api/v1/procurement/copilot/chat", response_model=CopilotDecisionOutput)
-async def copilot_chat(req: ChatRequest, tenant_id: str = Depends(verify_tenant_isolation)):
+@rate_limiter.limit("30/minute", session_rate_key)
+async def copilot_chat(
+    request: Request,
+    req: ChatRequest,
+    tenant_id: str = Depends(verify_tenant_isolation),
+):
     try:
         bridge = ProcureMindMemoryBridge()
         output = await bridge.append_message_turn(req.session_id, tenant_id, req.message)
@@ -509,7 +648,9 @@ async def copilot_chat(req: ChatRequest, tenant_id: str = Depends(verify_tenant_
 
 
 @app.post("/api/v1/procurement/ingest-history", status_code=status.HTTP_201_CREATED)
+@rate_limiter.limit("5/minute", tenant_rate_key)
 async def ingest_history(
+    request: Request,
     tenant_id: str = Depends(verify_tenant_isolation),
     purchase_history: Optional[UploadFile] = File(None),
     inventory_health: Optional[UploadFile] = File(None),
@@ -559,18 +700,28 @@ async def ingest_history(
             else:
                 continue
 
-            payloads_to_stage[vector_type] = records
+            payloads_to_stage[vector_type] = {
+                "file_name": upload_file.filename or f"{vector_type}.upload",
+                "records": records,
+            }
 
         # 2. Stage them in the database session
         staged_entries = []
+        staged_row_count = 0
         async with tenant_session(uuid.UUID(tenant_id)) as session:
-            for vector_type, records in payloads_to_stage.items():
-                staged = StagedIngestion(
-                    tenant_id=uuid.UUID(tenant_id),
-                    vector_type=vector_type,
-                    payload=records
-                )
-                session.add(staged)
+            for vector_type, staged_payload in payloads_to_stage.items():
+                records = staged_payload["records"]
+                file_name = staged_payload["file_name"]
+                for row_index, record in enumerate(records):
+                    staged = StagedIngestion(
+                        tenant_id=uuid.UUID(tenant_id),
+                        vector_type=vector_type,
+                        file_name=file_name,
+                        row_index=row_index,
+                        payload=[record],
+                    )
+                    session.add(staged)
+                    staged_row_count += 1
                 staged_entries.append(vector_type)
 
             await session.commit()
@@ -578,6 +729,7 @@ async def ingest_history(
         return {
             "status": "success",
             "staged_vectors": staged_entries,
+            "staged_rows": staged_row_count,
             "message": f"Successfully validated and staged {len(staged_entries)} vectors."
         }
     except ProcurementException:
@@ -590,3 +742,14 @@ async def ingest_history(
         )
 
 
+if __name__ == "__main__":
+    import uvicorn
+    port_env = os.getenv("PORT", "8000")
+    try:
+        port = int(port_env)
+    except ValueError:
+        logger.error(f"Invalid PORT environment variable '{port_env}', defaulting to 8000")
+        port = 8000
+    
+    logger.info(f"Starting production worker loop binding to port: {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, workers=4)

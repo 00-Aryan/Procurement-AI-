@@ -10,6 +10,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./web/node_modules
 COPY . .
 WORKDIR /app/web
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 # Stage 3: Run the production server

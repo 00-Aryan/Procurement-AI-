@@ -1,4 +1,9 @@
-const GATEWAY_ERROR_MARKERS = ["[VALIDATION_ERROR]", "[TENANT_AUTH_ERROR]"] as const;
+const GATEWAY_ERROR_MARKERS = [
+  "[VALIDATION_ERROR]",
+  "[TENANT_AUTH_ERROR]",
+  "[RATE_LIMIT_EXHAUSTED]",
+  "[DATA_ENGINEERING_ERROR]"
+] as const;
 
 export type GatewayErrorMarker = (typeof GATEWAY_ERROR_MARKERS)[number];
 

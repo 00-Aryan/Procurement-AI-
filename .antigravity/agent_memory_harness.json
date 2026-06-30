@@ -1,8 +1,8 @@
 {
   "project_scope": "ProcureMind AI Core",
   "active_milestone": "Production_Deployment_Track_Signoff",
-  "historical_state_check": 22,
-  "last_successful_compilation": "2026-06-30T15:02:00Z",
+  "historical_state_check": 30,
+  "last_successful_compilation": "2026-06-30T17:41:02Z",
   "hardened_backend_telemetry": {
     "total_load_tested_requests": 1000,
     "peak_concurrency_limit": 100,
@@ -12,7 +12,8 @@
   "enforced_api_contracts": [
     "POST /api/v1/procurement/simulate expects wrapped {'matrix': SimulationMatrix} schema",
     "Global error boundaries emit bracketed custom exception logs: [VALIDATION_ERROR] and [TENANT_AUTH_ERROR]",
-    "POST /api/v1/procurement/ingest-history accepts multi-part form files and stages validated records in PostgreSQL"
+    "POST /api/v1/procurement/ingest-history accepts multi-part form files and stages validated records in PostgreSQL",
+    "Track 1 gateway throttles emit [RATE_LIMIT_EXHAUSTED] at HTTP 429 for exhausted tenant or session windows"
   ],
   "local_postgres_infrastructure": {
     "status": "provisioned",
@@ -41,21 +42,23 @@
     ]
   },
   "last_execution_turn": {
-    "timestamp": "2026-06-30T15:02:00Z",
+    "timestamp": "2026-06-30T17:42:09Z",
     "active_milestone_phase": "Production_Deployment_Track_Signoff",
     "files_created": [],
     "files_modified": [
-      "backend.Dockerfile",
-      "pyproject.toml",
-      "uv.lock",
-      "web/frontend.Dockerfile"
+      "infra/database.py",
+      ".antigravity/agent_memory_harness.json"
     ],
     "technical_debt_or_shortcuts": [],
     "new_packages": [],
     "validation": [
-      "Rebased backend container to Python 3.12-slim base image",
-      "Pinned Python 3.12 constraints in pyproject.toml",
-      "Verified build/run orchestration, verified anomalies API output using curl"
+      "Reviewed mandatory .antigravity guardrails, core engineering role constraints, and infra/database.py before mutation.",
+      "Added DATABASE_URL prefix normalization for postgresql://, postgres://, and postgresql+asyncpg:// before create_async_engine().",
+      "Translated sslmode query values into asyncpg-compatible DATABASE_CONNECT_ARGS ssl values and removed sslmode from the engine URL query.",
+      "Preserved production missing-DATABASE_URL startup fault behavior while applying asyncpg driver sanitation.",
+      "Ran python3 -m compileall infra/database.py successfully.",
+      "Verified all three supported connection string prefixes with sslmode=require resolve to SQLAlchemy drivername postgresql+asyncpg, empty URL query, and DATABASE_CONNECT_ARGS {'ssl': 'require'} in isolated Python imports.",
+      "Attempted local git commit for infra/database.py and agent_memory_harness.json, but .git/index.lock creation failed because .git is read-only in the sandbox."
     ]
   }
 }
