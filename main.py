@@ -22,6 +22,34 @@ from core.ingestion_pipeline import ProcureMindDataIngestionGateway, DataEnginee
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("api_gateway")
 
+class SecurityConfigurationError(ProcurementException):
+    """Exception raised for critical security configuration faults."""
+    pass
+
+import os
+ENV_MODE = os.getenv("ENV_MODE")
+if ENV_MODE == "production":
+    if not os.getenv("DATABASE_URL"):
+        log_and_raise(
+            SecurityConfigurationError,
+            "CRITICAL_SECURITY_FAULT",
+            "SYSTEM_GLOBAL",
+            "startup_security_check",
+            "Production mode active but DATABASE_URL environment variable is missing."
+        )
+    from core.llm_memory_bridge import resolve_copilot_model, required_token_env_for_model
+    copilot_model = resolve_copilot_model()
+    token_env = required_token_env_for_model(copilot_model)
+    if not os.getenv(token_env):
+        log_and_raise(
+            SecurityConfigurationError,
+            "CRITICAL_SECURITY_FAULT",
+            "SYSTEM_GLOBAL",
+            "startup_security_check",
+            f"Production mode active but required API key environment variable '{token_env}' for model '{copilot_model}' is missing."
+        )
+
+
 # Load configuration at startup
 # Wrap in try/except block to gracefully fall back to default configurations if missing
 try:

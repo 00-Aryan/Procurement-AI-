@@ -32,10 +32,22 @@ class DatabaseLayerError(Exception):
     pass
 
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/aegisprocure"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    if os.getenv("ENV_MODE") == "production":
+        from core.config_parser import log_and_raise, ProcurementException
+        class SecurityConfigurationError(ProcurementException):
+            pass
+        log_and_raise(
+            SecurityConfigurationError,
+            "CRITICAL_SECURITY_FAULT",
+            "SYSTEM_GLOBAL",
+            "database_startup",
+            "Production environment detected but vital DATABASE_URL is missing."
+        )
+    else:
+        DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/aegisprocure"
+
 
 # Async engine creation with connection pool checking enabled
 engine = create_async_engine(
